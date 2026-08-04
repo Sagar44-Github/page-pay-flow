@@ -127,15 +127,17 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
     processed = await server.processHTTPRequest(context);
   } catch (error) {
     const timedOut = error instanceof FacilitatorTimeoutError;
+    const misconfigured = error instanceof MissingPayToError;
     const reason = error instanceof Error ? error.message : String(error);
     logRequest({
       route: ROUTE,
       pages: doc.pages,
       price: priceQuoted,
       paymentStatus: timedOut ? "gateway_timeout" : "failed",
-      outcome: timedOut ? "gateway_error" : "payment_failed",
+      outcome: timedOut || misconfigured ? "gateway_error" : "payment_failed",
       reason,
     });
+    if (misconfigured) return json({ error: "Server misconfigured", reason }, 500);
     return timedOut
       ? json({ error: "Payment gateway unavailable", reason, retryable: true }, 504)
       : json({ error: "Payment verification failed", reason }, 402);
