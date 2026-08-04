@@ -6,8 +6,8 @@
  * turns into a clean 504 instead of hanging.
  */
 import { HTTPFacilitatorClient } from "@x402-avm/core/server";
+import type { FacilitatorClient } from "@x402-avm/core/server";
 import type {
-  FacilitatorClient,
   PaymentPayload,
   PaymentRequirements,
   SettleResponse,
