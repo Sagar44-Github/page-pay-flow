@@ -1,0 +1,84 @@
+/**
+ * Hosted Algorand x402 facilitator client with a timeout + single retry.
+ *
+ * Every facilitator call (/supported, /verify, /settle) is wrapped so a slow or
+ * unreachable facilitator surfaces as a FacilitatorTimeoutError, which the route
+ * turns into a clean 504 instead of hanging.
+ */
+import { HTTPFacilitatorClient } from "@x402-avm/core/server";
+import type {
+  FacilitatorClient,
+  PaymentPayload,
+  PaymentRequirements,
+  SettleResponse,
+  SupportedResponse,
+  VerifyResponse,
+} from "@x402-avm/core/types";
+
+export const FACILITATOR_URL = "https://facilitator.goplausible.xyz";
+const CALL_TIMEOUT_MS = 15_000;
+
+export class FacilitatorTimeoutError extends Error {
+  constructor(
+    public readonly operation: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "FacilitatorTimeoutError";
+  }
+}
+
+async function withTimeout<T>(operation: string, fn: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new FacilitatorTimeoutError(operation, `facilitator ${operation} timed out`)),
+          CALL_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Run a facilitator call with one retry, then fail with FacilitatorTimeoutError. */
+async function withTimeoutAndRetry<T>(operation: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await withTimeout(operation, fn);
+  } catch (error) {
+    if (!(error instanceof FacilitatorTimeoutError)) throw error;
+    console.warn(`[pagepay] facilitator ${operation} timed out — retrying once`);
+    try {
+      return await withTimeout(operation, fn);
+    } catch (retryError) {
+      if (retryError instanceof FacilitatorTimeoutError) {
+        throw new FacilitatorTimeoutError(
+          operation,
+          `facilitator ${operation} timed out twice (${FACILITATOR_URL})`,
+        );
+      }
+      throw retryError;
+    }
+  }
+}
+
+/** Facilitator client that wraps the hosted Algorand facilitator with timeout + retry. */
+export class ResilientFacilitatorClient implements FacilitatorClient {
+  private readonly inner = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
+
+  verify(payload: PaymentPayload, requirements: PaymentRequirements): Promise<VerifyResponse> {
+    return withTimeoutAndRetry("verify", () => this.inner.verify(payload, requirements));
+  }
+
+  settle(payload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> {
+    return withTimeoutAndRetry("settle", () => this.inner.settle(payload, requirements));
+  }
+
+  getSupported(): Promise<SupportedResponse> {
+    return withTimeoutAndRetry("supported", () => this.inner.getSupported());
+  }
+}
