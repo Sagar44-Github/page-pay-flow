@@ -113,10 +113,11 @@ export function createRequestAdapter(request: Request, body: unknown): HTTPAdapt
 /** Build the x402 request context for a route. */
 export function createRequestContext(request: Request, body: unknown): HTTPRequestContext {
   const adapter = createRequestAdapter(request, body);
+  const paymentHeader = request.headers.get("x-payment");
   return {
     adapter,
     path: adapter.getPath(),
     method: adapter.getMethod(),
-    paymentHeader: request.headers.get("x-payment") ?? undefined,
+    ...(paymentHeader ? { paymentHeader } : {}),
   };
 }
