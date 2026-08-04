@@ -177,7 +177,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
 
   const { paymentPayload, paymentRequirements, declaredExtensions } = processed;
   const payer = (paymentPayload.payload["sender"] as string | undefined) ?? undefined;
-  const amountAtomic = paymentRequirements.maxAmountRequired;
+  const amountAtomic = paymentRequirements.amount;
 
   // 3. Settle on-chain before doing paid work.
   let settlement;
@@ -234,7 +234,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
       price: priceQuoted,
       paymentStatus: "settled",
       outcome: "summarized",
-      ...(settlement.payer ?? payer ? { payer: settlement.payer ?? payer } : {}),
+      ...(settlement.payer ?? payer ? { payer: (settlement.payer ?? payer) as string } : {}),
       txId,
     });
     return json(
