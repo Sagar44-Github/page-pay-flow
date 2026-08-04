@@ -245,7 +245,7 @@ export function SummarizeTab({ onActivity }: { onActivity: () => void }) {
           </div>
         )}
 
-        {failureBody && !summary?.summary && (
+        {Boolean(failureBody) && !summary?.summary && (
           <div className="rounded-xl border border-destructive/40 bg-card p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-destructive">
               Request failed
