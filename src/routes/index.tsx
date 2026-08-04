@@ -1,24 +1,46 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ClientOnly } from "@tanstack/react-router";
+import { Suspense, lazy } from "react";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+// Wallet SDKs touch browser globals at import time, so the whole app is client-only.
+const PagePayApp = lazy(() => import("@/components/pagepay/PagePayApp"));
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "PagePay — Pay-per-page AI summaries over x402 on Algorand" },
+      {
+        name: "description",
+        content:
+          "PagePay charges $0.01 per page for AI document summaries using the x402 payment protocol, settled on Algorand Testnet. No accounts, no subscriptions.",
+      },
+      { property: "og:title", content: "PagePay — Pay-per-page AI summaries over x402" },
+      {
+        property: "og:description",
+        content:
+          "Upload a document, get an HTTP 402 quote, pay per page from your Algorand wallet, and receive an AI summary.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
+function Loading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <p className="font-mono text-sm text-muted-foreground">loading PagePay…</p>
+    </div>
+  );
+}
+
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <ClientOnly fallback={<Loading />}>
+      <Suspense fallback={<Loading />}>
+        <PagePayApp />
+      </Suspense>
+    </ClientOnly>
   );
 }
