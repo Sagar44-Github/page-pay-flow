@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLogsRoute = ApiLogsRouteImport.update({
+  id: '/api/logs',
+  path: '/api/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPriceRoute = ApiPriceRouteImport.update({
@@ -31,30 +37,34 @@ const ApiSummarizeRoute = ApiSummarizeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/price' | '/api/summarize'
+  fullPaths: '/' | '/api/logs' | '/api/price' | '/api/summarize'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/price' | '/api/summarize'
-  id: '__root__' | '/' | '/api/price' | '/api/summarize'
+  to: '/' | '/api/logs' | '/api/price' | '/api/summarize'
+  id: '__root__' | '/' | '/api/logs' | '/api/price' | '/api/summarize'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiLogsRoute: typeof ApiLogsRoute
   ApiPriceRoute: typeof ApiPriceRoute
   ApiSummarizeRoute: typeof ApiSummarizeRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/logs': {
+      id: '/api/logs'
+      path: '/api/logs'
+      fullPath: '/api/logs'
+      preLoaderRoute: typeof ApiLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/price': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiLogsRoute: ApiLogsRoute,
   ApiPriceRoute: ApiPriceRoute,
   ApiSummarizeRoute: ApiSummarizeRoute,
 }
