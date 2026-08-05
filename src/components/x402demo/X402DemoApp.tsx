@@ -11,8 +11,8 @@ import { PaymentTimeline, type FlowStep, type StepState } from "@/components/x40
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   DEMO_MODES,
   DEMO_MODE_DESCRIPTIONS,
