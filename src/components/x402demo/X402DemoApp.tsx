@@ -513,9 +513,9 @@ export default function X402DemoApp() {
               1 · Simulation mode
             </h2>
             <Tabs value={mode} onValueChange={(value) => setMode(value as DemoMode)} className="mt-3">
-              <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-2">
+              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1">
                 {DEMO_MODES.map((value) => (
-                  <TabsTrigger key={value} value={value} className="text-xs">
+                  <TabsTrigger key={value} value={value} className="w-full text-xs">
                     {DEMO_MODE_LABELS[value]}
                   </TabsTrigger>
                 ))}
