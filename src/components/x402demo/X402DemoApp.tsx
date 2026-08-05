@@ -512,15 +512,23 @@ export default function X402DemoApp() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               1 · Simulation mode
             </h2>
-            <Tabs value={mode} onValueChange={(value) => setMode(value as DemoMode)} className="mt-3">
-              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1">
-                {DEMO_MODES.map((value) => (
-                  <TabsTrigger key={value} value={value} className="w-full text-xs">
-                    {DEMO_MODE_LABELS[value]}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {DEMO_MODES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMode(value)}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-xs font-medium transition-colors",
+                    mode === value
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {DEMO_MODE_LABELS[value]}
+                </button>
+              ))}
+            </div>
             <p className="mt-3 text-xs text-muted-foreground">{DEMO_MODE_DESCRIPTIONS[mode]}</p>
           </div>
 
