@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Play, Sparkles, Zap } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -61,6 +61,9 @@ const NETWORK = "algorand:testnet-v1.0";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let uidCounter = 0;
+const uid = (prefix: string) => `${prefix}-${(uidCounter += 1)}`;
+
 export default function X402DemoApp() {
   const [mode, setMode] = useState<DemoMode>("happy");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -76,7 +79,6 @@ export default function X402DemoApp() {
   const [result, setResult] = useState<UnlockedResult | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [running, setRunning] = useState<null | "live" | "simulated">(null);
-  const counter = useRef(0);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -89,11 +91,10 @@ export default function X402DemoApp() {
 
   const log = useCallback(
     (level: LogLevel, source: string, message: string, detail?: string) => {
-      counter.current += 1;
       setLogs((previous) => [
         ...previous,
         {
-          id: `log-${counter.current}`,
+          id: uid("log"),
           timestamp: new Date().toISOString(),
           level,
           source,
@@ -124,8 +125,7 @@ export default function X402DemoApp() {
   }, []);
 
   const pushExchange = useCallback((exchange: Omit<HttpExchange, "id">) => {
-    counter.current += 1;
-    setExchanges((previous) => [...previous, { ...exchange, id: `ex-${counter.current}` }]);
+    setExchanges((previous) => [...previous, { ...exchange, id: uid("ex") }]);
   }, []);
 
   const drainServerLog = useCallback(
