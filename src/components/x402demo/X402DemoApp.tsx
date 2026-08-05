@@ -484,7 +484,7 @@ export default function X402DemoApp() {
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               x402 Protocol Demo
               <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                groq · llama3 / mixtral
+                groq · llama 3.1 / 3.3
               </span>
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
