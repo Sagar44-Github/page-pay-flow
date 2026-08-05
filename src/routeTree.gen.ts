@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiGroqRouteImport } from './routes/api/groq'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
@@ -18,6 +19,11 @@ import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGroqRoute = ApiGroqRouteImport.update({
+  id: '/api/groq',
+  path: '/api/groq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLogsRoute = ApiLogsRouteImport.update({
@@ -43,6 +49,7 @@ const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
@@ -66,12 +75,24 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/api/logs' | '/api/price' | '/api/summarize' | '/api/x402-demo'
+    | '/'
+    | '/api/groq'
+    | '/api/logs'
+    | '/api/price'
+    | '/api/summarize'
+    | '/api/x402-demo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/logs' | '/api/price' | '/api/summarize' | '/api/x402-demo'
+  to:
+    | '/'
+    | '/api/groq'
+    | '/api/logs'
+    | '/api/price'
+    | '/api/summarize'
+    | '/api/x402-demo'
   id:
     | '__root__'
     | '/'
+    | '/api/groq'
     | '/api/logs'
     | '/api/price'
     | '/api/summarize'
@@ -80,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiGroqRoute: typeof ApiGroqRoute
   ApiLogsRoute: typeof ApiLogsRoute
   ApiPriceRoute: typeof ApiPriceRoute
   ApiSummarizeRoute: typeof ApiSummarizeRoute
@@ -93,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/groq': {
+      id: '/api/groq'
+      path: '/api/groq'
+      fullPath: '/api/groq'
+      preLoaderRoute: typeof ApiGroqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/logs': {
@@ -128,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiGroqRoute: ApiGroqRoute,
   ApiLogsRoute: ApiLogsRoute,
   ApiPriceRoute: ApiPriceRoute,
   ApiSummarizeRoute: ApiSummarizeRoute,
