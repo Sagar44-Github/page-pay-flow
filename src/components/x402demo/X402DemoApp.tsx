@@ -62,7 +62,8 @@ const NETWORK = "algorand:testnet-v1.0";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let uidCounter = 0;
-const uid = (prefix: string) => `${prefix}-${(uidCounter += 1)}`;
+const uid = (prefix: string) =>
+  `${prefix}-${(uidCounter += 1)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export default function X402DemoApp() {
   const [mode, setMode] = useState<DemoMode>("happy");
