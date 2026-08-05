@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { NetworkId, WalletId, WalletManager, WalletProvider } from "@txnlab/use-wallet-react";
 import { useMemo, useState } from "react";
 
@@ -36,7 +37,15 @@ export default function PagePayApp() {
                 settled on-chain per request — no accounts, no subscriptions.
               </p>
             </div>
-            <WalletButton />
+            <div className="flex items-center gap-3">
+              <Link
+                to="/x402-demo"
+                className="rounded-md border border-border px-3 py-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                x402 protocol demo →
+              </Link>
+              <WalletButton />
+            </div>
           </div>
         </header>
 

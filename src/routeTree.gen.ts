@@ -10,13 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as X402DemoRouteImport } from './routes/x402-demo'
+import { Route as ApiGroqRouteImport } from './routes/api/groq'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
+import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const X402DemoRoute = X402DemoRouteImport.update({
+  id: '/x402-demo',
+  path: '/x402-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGroqRoute = ApiGroqRouteImport.update({
+  id: '/api/groq',
+  path: '/api/groq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLogsRoute = ApiLogsRouteImport.update({
@@ -34,39 +47,78 @@ const ApiSummarizeRoute = ApiSummarizeRouteImport.update({
   path: '/api/summarize',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
+  id: '/api/x402-demo',
+  path: '/api/x402-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/x402-demo': typeof X402DemoRoute
+  '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
+  '/api/x402-demo': typeof ApiX402DemoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/x402-demo': typeof X402DemoRoute
+  '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
+  '/api/x402-demo': typeof ApiX402DemoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/x402-demo': typeof X402DemoRoute
+  '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
+  '/api/x402-demo': typeof ApiX402DemoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/logs' | '/api/price' | '/api/summarize'
+  fullPaths:
+    | '/'
+    | '/x402-demo'
+    | '/api/groq'
+    | '/api/logs'
+    | '/api/price'
+    | '/api/summarize'
+    | '/api/x402-demo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/logs' | '/api/price' | '/api/summarize'
-  id: '__root__' | '/' | '/api/logs' | '/api/price' | '/api/summarize'
+  to:
+    | '/'
+    | '/x402-demo'
+    | '/api/groq'
+    | '/api/logs'
+    | '/api/price'
+    | '/api/summarize'
+    | '/api/x402-demo'
+  id:
+    | '__root__'
+    | '/'
+    | '/x402-demo'
+    | '/api/groq'
+    | '/api/logs'
+    | '/api/price'
+    | '/api/summarize'
+    | '/api/x402-demo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  X402DemoRoute: typeof X402DemoRoute
+  ApiGroqRoute: typeof ApiGroqRoute
   ApiLogsRoute: typeof ApiLogsRoute
   ApiPriceRoute: typeof ApiPriceRoute
   ApiSummarizeRoute: typeof ApiSummarizeRoute
+  ApiX402DemoRoute: typeof ApiX402DemoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +128,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/x402-demo': {
+      id: '/x402-demo'
+      path: '/x402-demo'
+      fullPath: '/x402-demo'
+      preLoaderRoute: typeof X402DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/groq': {
+      id: '/api/groq'
+      path: '/api/groq'
+      fullPath: '/api/groq'
+      preLoaderRoute: typeof ApiGroqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/logs': {
@@ -99,14 +165,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSummarizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/x402-demo': {
+      id: '/api/x402-demo'
+      path: '/api/x402-demo'
+      fullPath: '/api/x402-demo'
+      preLoaderRoute: typeof ApiX402DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  X402DemoRoute: X402DemoRoute,
+  ApiGroqRoute: ApiGroqRoute,
   ApiLogsRoute: ApiLogsRoute,
   ApiPriceRoute: ApiPriceRoute,
   ApiSummarizeRoute: ApiSummarizeRoute,
+  ApiX402DemoRoute: ApiX402DemoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
