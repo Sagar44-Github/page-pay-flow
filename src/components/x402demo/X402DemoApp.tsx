@@ -1,0 +1,665 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Play, Sparkles, Zap } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import { HttpExchangeView, type HttpExchange } from "@/components/x402demo/HttpExchangeView";
+import { LogConsole, type LogEntry, type LogLevel } from "@/components/x402demo/LogConsole";
+import { PaymentTimeline, type FlowStep, type StepState } from "@/components/x402demo/PaymentTimeline";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DEMO_MODES,
+  DEMO_MODE_DESCRIPTIONS,
+  DEMO_MODE_LABELS,
+  encodePaymentHeader,
+  mockSignature,
+  randomNonce,
+  type DemoMode,
+  type DemoPaymentPayload,
+  type DemoServerLogEntry,
+} from "@/lib/x402demo/protocol";
+
+const formSchema = z.object({
+  prompt: z
+    .string()
+    .trim()
+    .min(8, "Give the gated resource at least 8 characters of context.")
+    .max(2000, "Keep the prompt under 2000 characters."),
+  model: z.enum(["llama3-8b-8192", "mixtral-8x7b-32768"]),
+});
+type FormValues = z.infer<typeof formSchema>;
+
+const STEP_DEFS = [
+  { key: "request", label: "Unpaid request", hint: "POST /api/x402-demo — no X-Payment header" },
+  { key: "challenge", label: "402 Payment Required", hint: "server returns payment requirements" },
+  { key: "construct", label: "X-Payment constructed", hint: "exact scheme payload, base64-encoded" },
+  { key: "authorize", label: "Payment authorized", hint: "payload verified by the resource server" },
+  { key: "settle", label: "Settlement complete", hint: "facilitator confirms the transfer" },
+  { key: "unlock", label: "Resource unlocked", hint: "Groq generates the gated content" },
+] as const;
+
+type StepKey = (typeof STEP_DEFS)[number]["key"];
+
+interface UnlockedResult {
+  content: string;
+  model: string;
+  latencyMs: number;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+  settlement: { success: boolean; network: string; transaction: string; payer: string };
+  simulated: boolean;
+}
+
+const MOCK_PAY_TO = "PAGEPAYDEMOMERCHANTADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const MOCK_PAYER = "DEMOWALLETPAYERADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const NETWORK = "algorand:testnet-v1.0";
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export default function X402DemoApp() {
+  const [mode, setMode] = useState<DemoMode>("happy");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [steps, setSteps] = useState<Record<StepKey, StepState>>({
+    request: "idle",
+    challenge: "idle",
+    construct: "idle",
+    authorize: "idle",
+    settle: "idle",
+    unlock: "idle",
+  });
+  const [exchanges, setExchanges] = useState<HttpExchange[]>([]);
+  const [result, setResult] = useState<UnlockedResult | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [running, setRunning] = useState<null | "live" | "simulated">(null);
+  const counter = useRef(0);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      prompt:
+        "Brief a technical audience on why HTTP 402 machine payments unlock new agent business models.",
+      model: "llama3-8b-8192",
+    },
+  });
+
+  const log = useCallback(
+    (level: LogLevel, source: string, message: string, detail?: string) => {
+      counter.current += 1;
+      setLogs((previous) => [
+        ...previous,
+        {
+          id: `log-${counter.current}`,
+          timestamp: new Date().toISOString(),
+          level,
+          source,
+          message,
+          ...(detail ? { detail } : {}),
+        },
+      ]);
+    },
+    [],
+  );
+
+  const setStep = useCallback((key: StepKey, state: StepState) => {
+    setSteps((previous) => ({ ...previous, [key]: state }));
+  }, []);
+
+  const resetRun = useCallback(() => {
+    setSteps({
+      request: "idle",
+      challenge: "idle",
+      construct: "idle",
+      authorize: "idle",
+      settle: "idle",
+      unlock: "idle",
+    });
+    setExchanges([]);
+    setResult(null);
+    setFailure(null);
+  }, []);
+
+  const pushExchange = useCallback((exchange: Omit<HttpExchange, "id">) => {
+    counter.current += 1;
+    setExchanges((previous) => [...previous, { ...exchange, id: `ex-${counter.current}` }]);
+  }, []);
+
+  const drainServerLog = useCallback(
+    (entries: DemoServerLogEntry[] | undefined) => {
+      for (const entry of entries ?? []) log(entry.level, "server", entry.message, entry.detail);
+    },
+    [log],
+  );
+
+  function buildPayload(): DemoPaymentPayload {
+    const nonce = randomNonce();
+    return {
+      x402Version: 1,
+      scheme: "exact",
+      network: NETWORK,
+      payload: {
+        from: MOCK_PAYER,
+        to: MOCK_PAY_TO,
+        asset: "10458941",
+        amount: "10000",
+        nonce,
+        validUntil: Math.floor(Date.now() / 1000) + 60,
+        signature: mockSignature(nonce),
+      },
+    };
+  }
+
+  /** Pure client-side simulation — no network, no payment, all states shown. */
+  async function runSimulation(values: FormValues) {
+    resetRun();
+    setRunning("simulated");
+    log("info", "test-mode", `Starting simulated x402 flow`, `mode=${mode}`);
+
+    setStep("request", "active");
+    await sleep(450);
+    pushExchange({
+      title: "Unpaid request → /api/x402-demo",
+      direction: "request",
+      method: "POST",
+      url: "/api/x402-demo",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ prompt: values.prompt, mode, model: values.model }, null, 2),
+    });
+    log("info", "http", "POST /api/x402-demo (simulated, no X-Payment header)");
+    setStep("request", "done");
+
+    setStep("challenge", "active");
+    await sleep(500);
+    const requirements = {
+      x402Version: 1,
+      accepts: [
+        {
+          scheme: "exact",
+          network: NETWORK,
+          resource: "/api/x402-demo",
+          payTo: MOCK_PAY_TO,
+          asset: "10458941",
+          amount: "10000",
+          amountFormatted: "$0.01",
+          maxTimeoutSeconds: 60,
+        },
+      ],
+      error: "Payment required",
+    };
+    pushExchange({
+      title: "402 Payment Required (simulated)",
+      direction: "response",
+      status: 402,
+      statusText: "Payment Required",
+      headers: {
+        "content-type": "application/json",
+        "x-payment-required": "true",
+        "x-x402-version": "1",
+        "www-authenticate": `x402 network="${NETWORK}", scheme="exact", amount="10000", asset="10458941"`,
+      },
+      body: JSON.stringify(requirements, null, 2),
+    });
+    log("warn", "x402", "402 Payment Required received", "$0.01 · exact · algorand:testnet-v1.0");
+    setStep("challenge", "done");
+
+    setStep("construct", "active");
+    await sleep(450);
+    const payload = buildPayload();
+    const header = encodePaymentHeader(payload);
+    pushExchange({
+      title: "Retry request with X-Payment header",
+      direction: "request",
+      method: "POST",
+      url: "/api/x402-demo",
+      headers: { "content-type": "application/json", "x-payment": header },
+      body: JSON.stringify(payload, null, 2),
+    });
+    log("info", "x402", "X-Payment header constructed", `${header.slice(0, 40)}…`);
+    setStep("construct", "done");
+
+    if (mode === "invalid") {
+      setStep("authorize", "active");
+      await sleep(600);
+      setStep("authorize", "error");
+      pushExchange({
+        title: "400 Invalid payment token (simulated)",
+        direction: "response",
+        status: 400,
+        statusText: "Bad Request",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          { error: "Invalid payment token", reason: "signature did not verify" },
+          null,
+          2,
+        ),
+      });
+      log("error", "x402", "Payment token rejected", "signature did not verify");
+      setFailure("Invalid payment token — the resource server rejected the X-Payment payload.");
+      toast.error("Invalid payment token (simulated)");
+      setRunning(null);
+      return;
+    }
+
+    setStep("authorize", "active");
+    await sleep(650);
+    log("success", "x402", "Payment authorized", `payer=${MOCK_PAYER.slice(0, 10)}…`);
+    setStep("authorize", "done");
+
+    setStep("settle", "active");
+    if (mode === "timeout") {
+      await sleep(1600);
+      setStep("settle", "error");
+      pushExchange({
+        title: "504 Gateway Timeout (simulated)",
+        direction: "response",
+        status: 504,
+        statusText: "Gateway Timeout",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          { error: "Gateway timeout", reason: "settlement window expired" },
+          null,
+          2,
+        ),
+      });
+      log("error", "facilitator", "Settlement timed out", "maxTimeoutSeconds exceeded");
+      setFailure("Payment timed out before settlement — nothing was charged, retry is safe.");
+      toast.error("Payment timed out (simulated)");
+      setRunning(null);
+      return;
+    }
+    if (mode === "failed") {
+      await sleep(900);
+      setStep("settle", "error");
+      pushExchange({
+        title: "402 Payment failed (simulated)",
+        direction: "response",
+        status: 402,
+        statusText: "Payment Required",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          { error: "Payment failed", reason: "insufficient_funds" },
+          null,
+          2,
+        ),
+      });
+      log("error", "facilitator", "Settlement rejected", "insufficient_funds");
+      setFailure("Settlement failed: insufficient_funds. Top up the wallet and retry.");
+      toast.error("Payment failed (simulated)");
+      setRunning(null);
+      return;
+    }
+
+    await sleep(900);
+    const transaction = `MOCKTX${payload.payload.nonce.slice(0, 20).toUpperCase()}`;
+    log("success", "facilitator", "Settlement confirmed", `txid=${transaction}`);
+    setStep("settle", "done");
+
+    setStep("unlock", "active");
+    await sleep(700);
+    const simulatedContent = [
+      "**Simulated gated resource** (Test Mode — no payment and no Groq call were made).",
+      "",
+      "- The resource server answered 402 with machine-readable payment requirements.",
+      "- The client constructed a base64 `X-Payment` payload under the `exact` scheme.",
+      "- Verification and settlement succeeded, and the paywalled response was released.",
+      "",
+      "Switch off Test Mode to run the same flow against `/api/x402-demo` with a live Groq completion.",
+    ].join("\n");
+    pushExchange({
+      title: "200 OK — resource unlocked (simulated)",
+      direction: "response",
+      status: 200,
+      statusText: "OK",
+      headers: {
+        "content-type": "application/json",
+        "x-payment-response": JSON.stringify({ success: true, network: NETWORK, transaction }),
+      },
+      body: JSON.stringify({ unlocked: true, content: "…", model: values.model }, null, 2),
+    });
+    setResult({
+      content: simulatedContent,
+      model: values.model,
+      latencyMs: 0,
+      settlement: { success: true, network: NETWORK, transaction, payer: MOCK_PAYER },
+      simulated: true,
+    });
+    log("success", "x402", "Resource unlocked", "simulated payload rendered");
+    setStep("unlock", "done");
+    toast.success("Simulated x402 flow complete");
+    setRunning(null);
+  }
+
+  /** Real round-trip against /api/x402-demo (402 → X-Payment retry → Groq). */
+  async function runLive(values: FormValues) {
+    resetRun();
+    setRunning("live");
+    const body = JSON.stringify({ prompt: values.prompt, mode, model: values.model });
+    log("info", "client", "Starting live x402 exchange", `mode=${mode} model=${values.model}`);
+
+    try {
+      setStep("request", "active");
+      pushExchange({
+        title: "Unpaid request → /api/x402-demo",
+        direction: "request",
+        method: "POST",
+        url: "/api/x402-demo",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(JSON.parse(body), null, 2),
+      });
+      const first = await fetch("/api/x402-demo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      });
+      const firstText = await first.text();
+      const firstHeaders: Record<string, string> = {};
+      first.headers.forEach((value, key) => {
+        firstHeaders[key] = value;
+      });
+      pushExchange({
+        title: "Server challenge",
+        direction: "response",
+        status: first.status,
+        statusText: first.statusText,
+        headers: firstHeaders,
+        body: firstText,
+      });
+      setStep("request", "done");
+
+      const firstJson = safeJson(firstText) as { serverLog?: DemoServerLogEntry[] };
+      drainServerLog(firstJson?.serverLog);
+
+      if (first.status !== 402) {
+        setStep("challenge", "error");
+        log("error", "x402", `Expected 402, received ${first.status}`);
+        setFailure(`Expected HTTP 402, received ${first.status}.`);
+        toast.error("Unexpected server response");
+        setRunning(null);
+        return;
+      }
+      setStep("challenge", "done");
+      log("warn", "x402", "402 Payment Required received", "$0.01 · exact · algorand:testnet-v1.0");
+
+      setStep("construct", "active");
+      const payload = buildPayload();
+      const header =
+        mode === "invalid" ? "not-a-valid-base64-payment-token" : encodePaymentHeader(payload);
+      pushExchange({
+        title: "Retry request with X-Payment header",
+        direction: "request",
+        method: "POST",
+        url: "/api/x402-demo",
+        headers: { "content-type": "application/json", "x-payment": header },
+        body: JSON.stringify(payload, null, 2),
+      });
+      log("info", "x402", "X-Payment header attached", `${header.slice(0, 40)}…`);
+      setStep("construct", "done");
+
+      setStep("authorize", "active");
+      const second = await fetch("/api/x402-demo", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-payment": header },
+        body,
+      });
+      const secondText = await second.text();
+      const secondHeaders: Record<string, string> = {};
+      second.headers.forEach((value, key) => {
+        secondHeaders[key] = value;
+      });
+      pushExchange({
+        title: second.ok ? "200 OK — resource unlocked" : `${second.status} paywall response`,
+        direction: "response",
+        status: second.status,
+        statusText: second.statusText,
+        headers: secondHeaders,
+        body: secondText,
+      });
+      const secondJson = safeJson(secondText) as {
+        serverLog?: DemoServerLogEntry[];
+        reason?: string;
+        error?: string;
+        content?: string;
+        model?: string;
+        latencyMs?: number;
+        usage?: UnlockedResult["usage"];
+        settlement?: UnlockedResult["settlement"];
+      };
+      drainServerLog(secondJson?.serverLog);
+
+      if (!second.ok) {
+        setStep("authorize", second.status === 400 ? "error" : "done");
+        if (second.status !== 400) setStep("settle", "error");
+        const reason = secondJson?.reason ?? `Request failed with ${second.status}`;
+        setFailure(reason);
+        log("error", "x402", secondJson?.error ?? "Request failed", reason);
+        toast.error(secondJson?.error ?? "Payment flow failed");
+        setRunning(null);
+        return;
+      }
+
+      setStep("authorize", "done");
+      setStep("settle", "done");
+      setStep("unlock", "active");
+      setResult({
+        content: secondJson.content ?? "",
+        model: secondJson.model ?? values.model,
+        latencyMs: secondJson.latencyMs ?? 0,
+        usage: secondJson.usage,
+        settlement:
+          secondJson.settlement ?? {
+            success: true,
+            network: NETWORK,
+            transaction: "unknown",
+            payer: MOCK_PAYER,
+          },
+        simulated: false,
+      });
+      setStep("unlock", "done");
+      log("success", "groq", "Gated content rendered", `${secondJson.latencyMs ?? 0}ms`);
+      toast.success("Resource unlocked");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      log("error", "client", "Exchange threw", reason);
+      setFailure(reason);
+      toast.error("Exchange failed");
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  const timeline: FlowStep[] = useMemo(
+    () => STEP_DEFS.map((definition) => ({ ...definition, state: steps[definition.key] })),
+    [steps],
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-6">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              x402 Protocol Demo
+              <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                groq · llama3 / mixtral
+              </span>
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Watch an HTTP 402 paywall negotiate a machine payment end to end: challenge, signed
+              X-Payment header, settlement, and the unlocked Groq-generated resource.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="font-mono text-[11px]">
+              scheme exact
+            </Badge>
+            <Badge variant="outline" className="font-mono text-[11px]">
+              {NETWORK}
+            </Badge>
+            <Badge variant="outline" className="font-mono text-[11px]">
+              $0.01 / request
+            </Badge>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <section className="space-y-6">
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              1 · Simulation mode
+            </h2>
+            <Tabs value={mode} onValueChange={(value) => setMode(value as DemoMode)} className="mt-3">
+              <TabsList className="grid w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-2">
+                {DEMO_MODES.map((value) => (
+                  <TabsTrigger key={value} value={value} className="text-xs">
+                    {DEMO_MODE_LABELS[value]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <p className="mt-3 text-xs text-muted-foreground">{DEMO_MODE_DESCRIPTIONS[mode]}</p>
+          </div>
+
+          <form
+            className="rounded-xl border border-border bg-card p-5"
+            onSubmit={form.handleSubmit(runLive)}
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              2 · Gated request
+            </h2>
+            <div className="mt-3 space-y-3">
+              <div>
+                <Label htmlFor="prompt" className="text-xs text-muted-foreground">
+                  What should the paid resource generate?
+                </Label>
+                <Textarea
+                  id="prompt"
+                  {...form.register("prompt")}
+                  className="mt-1 min-h-28 font-mono text-xs"
+                />
+                {form.formState.errors.prompt && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.prompt.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="model" className="text-xs text-muted-foreground">
+                  Groq model
+                </Label>
+                <select
+                  id="model"
+                  {...form.register("model")}
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-xs text-foreground"
+                >
+                  <option value="llama3-8b-8192">llama3-8b-8192</option>
+                  <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                </select>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={running !== null} className="gap-2">
+                  <Zap className="h-4 w-4" />
+                  {running === "live" ? "Running exchange…" : "Run live x402 flow"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={running !== null}
+                  className="gap-2"
+                  onClick={form.handleSubmit(runSimulation)}
+                >
+                  <Play className="h-4 w-4" />
+                  {running === "simulated" ? "Simulating…" : "Test Mode (no payment)"}
+                </Button>
+              </div>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                Test Mode mocks every step client-side. The live flow calls the real
+                /api/x402-demo route and Groq.
+              </p>
+            </div>
+          </form>
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              3 · Payment status
+            </h2>
+            <div className="mt-4">
+              <PaymentTimeline steps={timeline} />
+            </div>
+            {failure && (
+              <p className="mt-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {failure}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              HTTP exchange · raw headers &amp; payloads
+            </h2>
+            {exchanges.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Run a flow to capture each request and response verbatim.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {exchanges.map((exchange, index) => (
+                  <HttpExchangeView
+                    key={exchange.id}
+                    exchange={exchange}
+                    defaultOpen={index === 1}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="h-80">
+            <LogConsole entries={logs} onClear={() => setLogs([])} />
+          </div>
+
+          {result && (
+            <div className="rounded-xl border border-primary/40 bg-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-primary">
+                  <Sparkles className="h-4 w-4" /> Unlocked resource
+                </h2>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {result.simulated ? "simulated" : "live"} · {result.model} · {result.latencyMs}ms
+                  {result.usage?.total_tokens ? ` · ${result.usage.total_tokens} tokens` : ""}
+                </span>
+              </div>
+              <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
+                <dt>settled</dt>
+                <dd className="text-card-foreground">{String(result.settlement.success)}</dd>
+                <dt>network</dt>
+                <dd className="text-card-foreground">{result.settlement.network}</dd>
+                <dt>txid</dt>
+                <dd className="break-all text-card-foreground">{result.settlement.transaction}</dd>
+                <dt>payer</dt>
+                <dd className="break-all text-card-foreground">{result.settlement.payer}</dd>
+              </dl>
+              <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
+                {result.content}
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
