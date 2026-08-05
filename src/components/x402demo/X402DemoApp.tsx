@@ -91,10 +91,11 @@ export default function X402DemoApp() {
 
   const log = useCallback(
     (level: LogLevel, source: string, message: string, detail?: string) => {
+      const id = uid("log");
       setLogs((previous) => [
         ...previous,
         {
-          id: uid("log"),
+          id,
           timestamp: new Date().toISOString(),
           level,
           source,
@@ -125,7 +126,8 @@ export default function X402DemoApp() {
   }, []);
 
   const pushExchange = useCallback((exchange: Omit<HttpExchange, "id">) => {
-    setExchanges((previous) => [...previous, { ...exchange, id: uid("ex") }]);
+    const id = uid("ex");
+    setExchanges((previous) => [...previous, { ...exchange, id }]);
   }, []);
 
   const drainServerLog = useCallback(
