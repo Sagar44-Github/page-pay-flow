@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
+import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const ApiSummarizeRoute = ApiSummarizeRouteImport.update({
   path: '/api/summarize',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
+  id: '/api/x402-demo',
+  path: '/api/x402-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
+  '/api/x402-demo': typeof ApiX402DemoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
+  '/api/x402-demo': typeof ApiX402DemoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,21 @@ export interface FileRoutesById {
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
   '/api/summarize': typeof ApiSummarizeRoute
+  '/api/x402-demo': typeof ApiX402DemoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/logs' | '/api/price' | '/api/summarize'
+  fullPaths:
+    '/' | '/api/logs' | '/api/price' | '/api/summarize' | '/api/x402-demo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/logs' | '/api/price' | '/api/summarize'
-  id: '__root__' | '/' | '/api/logs' | '/api/price' | '/api/summarize'
+  to: '/' | '/api/logs' | '/api/price' | '/api/summarize' | '/api/x402-demo'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/logs'
+    | '/api/price'
+    | '/api/summarize'
+    | '/api/x402-demo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +83,7 @@ export interface RootRouteChildren {
   ApiLogsRoute: typeof ApiLogsRoute
   ApiPriceRoute: typeof ApiPriceRoute
   ApiSummarizeRoute: typeof ApiSummarizeRoute
+  ApiX402DemoRoute: typeof ApiX402DemoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSummarizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/x402-demo': {
+      id: '/api/x402-demo'
+      path: '/api/x402-demo'
+      fullPath: '/api/x402-demo'
+      preLoaderRoute: typeof ApiX402DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +131,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLogsRoute: ApiLogsRoute,
   ApiPriceRoute: ApiPriceRoute,
   ApiSummarizeRoute: ApiSummarizeRoute,
+  ApiX402DemoRoute: ApiX402DemoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
