@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as X402DemoRouteImport } from './routes/x402-demo'
 import { Route as ApiGroqRouteImport } from './routes/api/groq'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
@@ -19,6 +20,11 @@ import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const X402DemoRoute = X402DemoRouteImport.update({
+  id: '/x402-demo',
+  path: '/x402-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGroqRoute = ApiGroqRouteImport.update({
@@ -49,6 +55,7 @@ const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/x402-demo': typeof X402DemoRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/x402-demo': typeof X402DemoRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/x402-demo': typeof X402DemoRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/price': typeof ApiPriceRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/x402-demo'
     | '/api/groq'
     | '/api/logs'
     | '/api/price'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/x402-demo'
     | '/api/groq'
     | '/api/logs'
     | '/api/price'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/x402-demo'
     | '/api/groq'
     | '/api/logs'
     | '/api/price'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  X402DemoRoute: typeof X402DemoRoute
   ApiGroqRoute: typeof ApiGroqRoute
   ApiLogsRoute: typeof ApiLogsRoute
   ApiPriceRoute: typeof ApiPriceRoute
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/x402-demo': {
+      id: '/x402-demo'
+      path: '/x402-demo'
+      fullPath: '/x402-demo'
+      preLoaderRoute: typeof X402DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/groq': {
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  X402DemoRoute: X402DemoRoute,
   ApiGroqRoute: ApiGroqRoute,
   ApiLogsRoute: ApiLogsRoute,
   ApiPriceRoute: ApiPriceRoute,
