@@ -1,9 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ClientOnly } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute } from "@tanstack/react-router";
 import { Suspense, lazy } from "react";
 
-// Wallet SDKs touch browser globals at import time, so the whole app is client-only.
-const PagePayApp = lazy(() => import("@/components/pagepay/PagePayApp"));
+// Wallet + WebGL both touch browser globals at import time, so the page is client-only.
+const LandingPage = lazy(() => import("@/landing/LandingPage"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,13 +11,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "PagePay charges $0.01 per page for AI document summaries using the x402 payment protocol, settled on Algorand Testnet. No accounts, no subscriptions.",
+          "PagePay charges one cent per page for AI document summaries using the x402 payment protocol, settled on Algorand Testnet with Pera Wallet. No accounts, no subscriptions.",
       },
       { property: "og:title", content: "PagePay — Pay-per-page AI summaries over x402" },
       {
         property: "og:description",
         content:
-          "Upload a document, get an HTTP 402 quote, pay per page from your Algorand wallet, and receive an AI summary.",
+          "Submit a document, get an HTTP 402 quote, pay per page from Pera Wallet, and receive an AI summary.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -29,8 +28,19 @@ export const Route = createFileRoute("/")({
 
 function Loading() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <p className="font-mono text-sm text-muted-foreground">loading PagePay…</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#ffffff",
+        color: "#7a7a7a",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 17,
+        letterSpacing: "-0.374px",
+      }}
+    >
+      Loading PagePay…
     </div>
   );
 }
@@ -39,7 +49,7 @@ function Index() {
   return (
     <ClientOnly fallback={<Loading />}>
       <Suspense fallback={<Loading />}>
-        <PagePayApp />
+        <LandingPage />
       </Suspense>
     </ClientOnly>
   );
