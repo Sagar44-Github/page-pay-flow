@@ -26,7 +26,7 @@ function Pages({
   const pages = useRef<THREE.Mesh[]>([]);
   const elapsed = useRef(animate ? 0 : 3);
 
-  const geometry = useMemo(() => new THREE.BoxGeometry(2.1, 2.85, 0.035), []);
+  const geometry = useMemo(() => new THREE.BoxGeometry(1.5, 2.0, 0.03), []);
 
   useFrame((_, delta) => {
     elapsed.current += delta;
@@ -38,10 +38,10 @@ function Pages({
       if (!mesh) return;
       const stagger = Math.max(0, Math.min(1, (intro - index * 0.06) / 0.7));
       const appear = easeOutCubic(stagger);
-      const spread = 0.26 * (1 - collapse);
+      const spread = 0.34 * (1 - collapse);
       const target = (index - (PAGE_COUNT - 1) / 2) * spread;
       mesh.position.y = target + (1 - appear) * 1.6;
-      mesh.position.x = (index - (PAGE_COUNT - 1) / 2) * 0.05 * (1 - collapse);
+      mesh.position.x = (index - (PAGE_COUNT - 1) / 2) * 0.09 * (1 - collapse);
       mesh.rotation.z = (1 - collapse) * (index % 2 === 0 ? 0.02 : -0.02);
       const material = mesh.material as THREE.MeshPhysicalMaterial;
       material.opacity = appear * (index === PAGE_COUNT - 1 ? 1 : 1 - collapse * 0.55);
@@ -49,15 +49,15 @@ function Pages({
 
     if (group.current) {
       const idle = animate ? Math.sin(elapsed.current * 0.25) * 0.09 : 0;
-      group.current.rotation.y = -0.5 + settle * 0.5 + idle - collapse * 0.35;
-      group.current.rotation.x = 0.26 - collapse * 0.2;
+      group.current.rotation.y = -0.7 + settle * 0.35 + idle - collapse * 0.3;
+      group.current.rotation.x = 0.62 - collapse * 0.42;
       group.current.position.y = -0.2 * collapse;
       group.current.scale.setScalar(0.94 + settle * 0.06 + collapse * 0.06);
     }
   });
 
   return (
-    <group ref={group} rotation={[0.26, -0.5, 0]}>
+    <group ref={group} rotation={[0.62, -0.7, 0]}>
       {Array.from({ length: PAGE_COUNT }).map((_, index) => (
         <mesh
           key={index}
@@ -97,7 +97,7 @@ export default function HeroScene({
     <Canvas
       dpr={[1, 2]}
       frameloop={animate ? "always" : "demand"}
-      camera={{ position: [0, 0.2, 6.2], fov: 34 }}
+      camera={{ position: [0, 0.6, 7.4], fov: 32 }}
       gl={{ antialias: true, alpha: true }}
       style={{ width: "100%", height: "100%" }}
     >
