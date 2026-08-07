@@ -4,7 +4,6 @@ import { HowItWorks } from "@/landing/HowItWorks";
 import { LiveDemo } from "@/landing/LiveDemo";
 import { Nav } from "@/landing/Nav";
 import { Pricing } from "@/landing/Pricing";
-import "@/landing/landing.css";
 import { usePeraWallet } from "@/lib/wallet/pera";
 
 function scrollTo(id: string) {
@@ -15,10 +14,10 @@ export default function LandingPage() {
   const wallet = usePeraWallet();
 
   return (
-    <div className="pp" id="top">
+    <div className="min-h-screen bg-background" id="top">
       <Nav wallet={wallet} />
       <main>
-        <Hero onTryIt={() => scrollTo("live-demo")} onHowItWorks={() => scrollTo("how-it-works")} />
+        <Hero onTryIt={() => scrollTo("live-demo")} />
         <HowItWorks />
         <LiveDemo wallet={wallet} />
         <Pricing />

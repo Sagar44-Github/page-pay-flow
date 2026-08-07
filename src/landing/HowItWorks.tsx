@@ -1,41 +1,42 @@
 const STEPS = [
   {
-    title: "Submit a document",
-    body: "Drop in a PDF or paste raw text. PagePay counts real pages — a PDF page, or roughly 500 words of text.",
+    step: "01",
+    title: "Request the resource",
+    body: "POST your document to /api/summarize with no payment attached.",
   },
   {
-    title: "Get a price",
-    body: "The server answers HTTP 402 Payment Required with signed payment requirements: one cent per page, priced for this exact request.",
+    step: "02",
+    title: "402 Payment Required",
+    body: "The x402 resource server replies with the exact price, asset, network and payTo address.",
   },
   {
-    title: "Pay in one tap",
-    body: "Pera Wallet signs the exact-amount payment on Algorand Testnet. The app never sees a key, and there is nothing to subscribe to.",
+    step: "03",
+    title: "Sign in Pera Wallet",
+    body: "The client builds the exact-scheme payment and Pera signs it on Algorand Testnet.",
   },
   {
-    title: "Receive the summary",
-    body: "The request replays with the payment header, the facilitator settles it, and the summary returns with its settlement receipt.",
+    step: "04",
+    title: "Retry and unlock",
+    body: "The retried request carries X-PAYMENT; the facilitator settles and the summary returns.",
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="pp-section pp-dark" aria-labelledby="pp-how-title">
-      <div className="pp-inner">
-        <h2 id="pp-how-title" className="pp-display-lg">
-          Four steps. No account anywhere in them.
+    <section id="how-it-works" className="border-b border-border">
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          How the exchange works
         </h2>
-        <p className="pp-lead pp-muted" style={{ marginTop: 24, maxWidth: 720 }}>
-          This is the real x402 exchange, not a diagram of one.
-        </p>
-        <ol className="pp-steps">
-          {STEPS.map((step, index) => (
-            <li className="pp-step" key={step.title}>
-              <span className="pp-step-num">{String(index + 1).padStart(2, "0")}</span>
-              <h3>{step.title}</h3>
-              <p className="pp-body pp-muted">{step.body}</p>
-            </li>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((item) => (
+            <div key={item.step} className="rounded-xl border border-border bg-card p-5">
+              <p className="font-mono text-[11px] text-primary">{item.step}</p>
+              <p className="mt-2 text-sm font-medium text-card-foreground">{item.title}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{item.body}</p>
+            </div>
           ))}
-        </ol>
+        </div>
       </div>
     </section>
   );

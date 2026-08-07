@@ -1,89 +1,34 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
-const HeroScene = lazy(() => import("@/landing/HeroScene"));
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(true);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(query.matches);
-    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return reduced;
-}
-
-export function Hero({ onTryIt, onHowItWorks }: { onTryIt: () => void; onHowItWorks: () => void }) {
-  const reducedMotion = usePrefersReducedMotion();
-  const scrollRef = useRef(0);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    if (reducedMotion) return;
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const element = stageRef.current;
-      if (!element) return;
-      const rect = element.getBoundingClientRect();
-      const travel = rect.height + window.innerHeight * 0.3;
-      scrollRef.current = Math.min(1, Math.max(0, -rect.top / travel));
-    };
-    const onScroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
-  }, [reducedMotion]);
-
+export function Hero({ onTryIt }: { onTryIt: () => void }) {
   return (
-    <section className="pp-hero" aria-labelledby="pp-hero-title">
-      <div className="pp-hero-grid">
-        <div className="pp-hero-copy">
-          <h1 id="pp-hero-title" className="pp-hero-display">
-            Many pages in.
-            <br />
-            One paid summary out.
-          </h1>
-          <p className="pp-lead pp-hero-sub">
-            PagePay reads your document and charges a cent a page — settled on-chain, per request,
-            over the x402 payment protocol.
-          </p>
-          <div className="pp-btn-row">
-            <button type="button" className="pp-btn" onClick={onTryIt}>
-              Try it now
-            </button>
-            <button type="button" className="pp-btn pp-btn-ghost" onClick={onHowItWorks}>
-              How it works
-            </button>
-          </div>
-          <p className="pp-caption pp-hero-meta">
-            No accounts. No subscriptions. Algorand Testnet, Pera Wallet.
-          </p>
+    <section className="border-b border-border bg-card/30">
+      <div className="mx-auto max-w-7xl px-6 py-14">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="font-mono text-[11px]">
+            scheme exact
+          </Badge>
+          <Badge variant="outline" className="font-mono text-[11px]">
+            algorand:testnet-v1.0
+          </Badge>
+          <Badge variant="outline" className="font-mono text-[11px]">
+            $0.01 / page
+          </Badge>
         </div>
-
-        <div className="pp-stage" ref={stageRef}>
-          <div className="pp-stage-object">
-            {mounted ? (
-              <Suspense
-                fallback={
-                  <div className="pp-stage-fallback pp-caption">Preparing the page stack…</div>
-                }
-              >
-                <HeroScene scrollRef={scrollRef} animate={!reducedMotion} />
-              </Suspense>
-            ) : (
-              <div className="pp-stage-fallback pp-caption">Preparing the page stack…</div>
-            )}
-          </div>
+        <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          Pay-per-page AI summaries, settled over HTTP 402.
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Submit a document, receive a machine-readable 402 quote, sign one payment from Pera
+          Wallet on Algorand Testnet, and get the summary back on the retried request. No
+          accounts, no subscriptions, no minimums.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button onClick={onTryIt}>Try the live flow</Button>
+          <Button variant="secondary" asChild>
+            <a href="/x402-demo">Inspect the protocol</a>
+          </Button>
         </div>
       </div>
     </section>

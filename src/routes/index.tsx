@@ -28,19 +28,8 @@ export const Route = createFileRoute("/")({
 
 function Loading() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#ffffff",
-        color: "#7a7a7a",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 17,
-        letterSpacing: "-0.374px",
-      }}
-    >
-      Loading PagePay…
+    <div className="flex min-h-screen items-center justify-center bg-background font-mono text-xs text-muted-foreground">
+      loading pagepay…
     </div>
   );
 }

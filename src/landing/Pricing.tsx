@@ -1,35 +1,27 @@
-import { MAX_PAGES, PRICE_PER_PAGE_USD } from "@/lib/pagepay/pricing";
+const FACTS = [
+  { label: "Price", value: "$0.01", detail: "per page, quoted per request" },
+  { label: "Network", value: "Algorand Testnet", detail: "algorand:testnet-v1.0" },
+  { label: "Asset", value: "USDC (ASA 10458941)", detail: "exact scheme, 6 decimals" },
+  { label: "Settlement", value: "GoPlausible facilitator", detail: "verify + settle, ~3s" },
+];
 
 export function Pricing() {
   return (
-    <section id="pricing" className="pp-section pp-dark-3" aria-labelledby="pp-pricing-title">
-      <div className="pp-inner">
-        <h2 id="pp-pricing-title" className="pp-display-lg">
-          One cent a page. That is the whole price list.
+    <section id="pricing" className="border-b border-border">
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Pricing &amp; settlement
         </h2>
-        <p className="pp-lead pp-muted" style={{ marginTop: 24, maxWidth: 720 }}>
-          You pay for the pages you send, at the moment you send them. Nothing renews.
-        </p>
-        <div className="pp-price-row">
-          <div>
-            <p className="pp-price-figure">${PRICE_PER_PAGE_USD.toFixed(2)}</p>
-            <p className="pp-body pp-muted" style={{ marginTop: 12 }}>
-              per page, quoted per request in the 402 response
-            </p>
-          </div>
-          <div>
-            <p className="pp-price-figure">{MAX_PAGES}</p>
-            <p className="pp-body pp-muted" style={{ marginTop: 12 }}>
-              pages maximum per document, so a full run costs $
-              {(MAX_PAGES * PRICE_PER_PAGE_USD).toFixed(2)}
-            </p>
-          </div>
-          <div>
-            <p className="pp-price-figure">$0</p>
-            <p className="pp-body pp-muted" style={{ marginTop: 12 }}>
-              subscription, minimum, or account. Idle costs nothing because there is no plan.
-            </p>
-          </div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {FACTS.map((fact) => (
+            <div key={fact.label} className="rounded-xl border border-border bg-card p-5">
+              <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                {fact.label}
+              </p>
+              <p className="mt-2 text-base font-medium text-card-foreground">{fact.value}</p>
+              <p className="mt-1 font-mono text-[11px] text-muted-foreground">{fact.detail}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
