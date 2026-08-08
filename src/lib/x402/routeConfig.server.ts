@@ -10,10 +10,12 @@ import { registerExactAvmScheme } from "@x402-avm/avm/exact/server";
 import { x402ResourceServer, x402HTTPResourceServer } from "@x402-avm/core/server";
 import type { HTTPAdapter, HTTPRequestContext, RoutesConfig } from "@x402-avm/core/http";
 
+import { getConfig } from "@/lib/pagepay/config.server";
 import { priceForPages } from "@/lib/pagepay/pricing";
 import { ResilientFacilitatorClient } from "./facilitator.server";
 
 export const SUMMARIZE_ROUTE = "POST /api/summarize";
+/** Compiled default; the live value is getConfig().network. */
 export const X402_NETWORK = ALGORAND_TESTNET_CAIP2;
 
 /** Request body shape the pricing function reads. */
@@ -28,20 +30,21 @@ function readPageCount(context: HTTPRequestContext): number {
 }
 
 function buildRoutes(): RoutesConfig {
+  const network = getConfig().network;
   return {
     [SUMMARIZE_ROUTE]: {
       description: "Pay-per-page AI document summary",
       mimeType: "application/json",
       accepts: {
         scheme: "exact",
-        network: X402_NETWORK,
+        network,
         // Read per request so the merchant address can be rotated without a rebuild.
         payTo: () => {
-          const payTo = process.env["RESOURCE_PAY_TO"];
+          const payTo = getConfig().payTo;
           if (!payTo) throw new MissingPayToError();
           return payTo;
         },
-        price: (context) => priceForPages(readPageCount(context)),
+        price: (context) => priceForPages(readPageCount(context), getConfig().pricePerPageUsd),
         maxTimeoutSeconds: 120,
       },
       unpaidResponseBody: (context) => {
@@ -81,8 +84,9 @@ let cached: Promise<x402HTTPResourceServer> | undefined;
 export function getResourceServer(): Promise<x402HTTPResourceServer> {
   if (!cached) {
     cached = (async () => {
-      const core = new x402ResourceServer(new ResilientFacilitatorClient());
-      registerExactAvmScheme(core, { networks: [X402_NETWORK] });
+      const config = getConfig();
+      const core = new x402ResourceServer(new ResilientFacilitatorClient(config.facilitatorUrl));
+      registerExactAvmScheme(core, { networks: [config.network] });
       const httpServer = new x402HTTPResourceServer(core, buildRoutes());
       await httpServer.initialize();
       return httpServer;
@@ -92,6 +96,11 @@ export function getResourceServer(): Promise<x402HTTPResourceServer> {
     });
   }
   return cached;
+}
+
+/** Drop the cached resource server so the next request rebuilds it from live config. */
+export function resetResourceServer(): void {
+  cached = undefined;
 }
 
 /** Minimal HTTPAdapter over a fetch Request plus the already-parsed body. */
