@@ -18,8 +18,8 @@ export function pagesForText(text: string): number {
 }
 
 /** USD price string in x402 `Money` format, e.g. "$0.03". */
-export function priceForPages(pages: number): string {
-  return `$${(pages * PRICE_PER_PAGE_USD).toFixed(2)}`;
+export function priceForPages(pages: number, ratePerPageUsd = PRICE_PER_PAGE_USD): string {
+  return `$${(pages * ratePerPageUsd).toFixed(2)}`;
 }
 
 /** Format an atomic asset amount (base units) for display. */

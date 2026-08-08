@@ -15,7 +15,10 @@ import type {
   VerifyResponse,
 } from "@x402-avm/core/types";
 
-export const FACILITATOR_URL = "https://facilitator.goplausible.xyz";
+import { DEFAULT_FACILITATOR_URL, getConfig } from "@/lib/pagepay/config.server";
+
+/** @deprecated read the runtime value via getConfig().facilitatorUrl */
+export const FACILITATOR_URL = DEFAULT_FACILITATOR_URL;
 const CALL_TIMEOUT_MS = 15_000;
 
 export class FacilitatorTimeoutError extends Error {
@@ -58,7 +61,7 @@ async function withTimeoutAndRetry<T>(operation: string, fn: () => Promise<T>): 
       if (retryError instanceof FacilitatorTimeoutError) {
         throw new FacilitatorTimeoutError(
           operation,
-          `facilitator ${operation} timed out twice (${FACILITATOR_URL})`,
+          `facilitator ${operation} timed out twice (${getConfig().facilitatorUrl})`,
         );
       }
       throw retryError;
@@ -68,7 +71,11 @@ async function withTimeoutAndRetry<T>(operation: string, fn: () => Promise<T>): 
 
 /** Facilitator client that wraps the hosted Algorand facilitator with timeout + retry. */
 export class ResilientFacilitatorClient implements FacilitatorClient {
-  private readonly inner = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
+  private readonly inner: HTTPFacilitatorClient;
+
+  constructor(url: string = getConfig().facilitatorUrl) {
+    this.inner = new HTTPFacilitatorClient({ url });
+  }
 
   verify(payload: PaymentPayload, requirements: PaymentRequirements): Promise<VerifyResponse> {
     return withTimeoutAndRetry("verify", () => this.inner.verify(payload, requirements));
