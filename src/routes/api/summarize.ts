@@ -6,13 +6,10 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 
-import { MAX_UPLOAD_BYTES, formatAtomicAmount } from "@/lib/pagepay/pricing";
-import {
-  DocumentError,
-  parsePdf,
-  parseTextInput,
-  type ParsedDocument,
-} from "@/lib/pagepay/document.server";
+import { formatAtomicAmount, priceForPages } from "@/lib/pagepay/pricing";
+import { getConfig } from "@/lib/pagepay/config.server";
+import { DocumentError, type ParsedDocument } from "@/lib/pagepay/document.server";
+import { readDocumentFromRequest } from "@/lib/pagepay/intake.server";
 import { SummarizerError, summarizeDocument } from "@/lib/pagepay/summarizer.server";
 import { logRequest } from "@/lib/services/pagepayLogger.server";
 import { FacilitatorTimeoutError } from "@/lib/x402/facilitator.server";
@@ -32,48 +29,11 @@ function json(body: unknown, status: number, headers: Record<string, string> = {
   });
 }
 
-async function readDocument(request: Request): Promise<ParsedDocument> {
-  const contentType = request.headers.get("content-type") ?? "";
-
-  if (contentType.includes("multipart/form-data")) {
-    const form = await request.formData();
-    const file = form.get("file");
-    const text = form.get("text");
-    if (file && typeof file !== "string") {
-      if (file.size > MAX_UPLOAD_BYTES) {
-        throw new DocumentError("File is larger than the 10 MB limit.");
-      }
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      if (isPdf) return parsePdf(bytes, file.name);
-      const decoded = new TextDecoder().decode(bytes);
-      return { ...parseTextInput(decoded), filename: file.name };
-    }
-    if (typeof text === "string") return parseTextInput(text);
-    throw new DocumentError("Attach a `file` or a `text` field.");
-  }
-
-  let payload: unknown;
-  try {
-    payload = await request.json();
-  } catch {
-    throw new DocumentError("Request body must be JSON or multipart/form-data.");
-  }
-  const body = (payload ?? {}) as { text?: unknown; filename?: unknown };
-  if (typeof body.text !== "string") {
-    throw new DocumentError("Provide a `text` string (or upload a file as multipart/form-data).");
-  }
-  return {
-    ...parseTextInput(body.text),
-    ...(typeof body.filename === "string" ? { filename: body.filename } : {}),
-  };
-}
-
 async function handleSummarize({ request }: { request: Request }): Promise<Response> {
   // 1. Document intake — bad input never reaches the payment layer.
   let doc: ParsedDocument;
   try {
-    doc = await readDocument(request);
+    doc = await readDocumentFromRequest(request);
   } catch (error) {
     const reason = error instanceof DocumentError ? error.reason : "Unreadable request body.";
     logRequest({
@@ -87,7 +47,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
     return json({ error: "Bad request", reason }, 400);
   }
 
-  const priceQuoted = `$${(doc.pages * 0.01).toFixed(2)}`;
+  const priceQuoted = priceForPages(doc.pages, getConfig().pricePerPageUsd);
 
   // 2. x402: verify payment or emit the protocol's own 402 response.
   let server;
