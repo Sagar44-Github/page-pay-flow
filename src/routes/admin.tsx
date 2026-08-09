@@ -148,8 +148,13 @@ function AdminPage() {
     setBusy(true);
     try {
       const result = await reset();
+      if (!result.ok || !result.settings) {
+        setError(result.error ?? "Reset failed.");
+        return;
+      }
       apply(result.settings);
       setSuccess("Runtime overrides cleared — values now come from the server environment.");
+
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : "Reset failed.");
     } finally {
