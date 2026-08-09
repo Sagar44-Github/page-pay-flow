@@ -154,7 +154,6 @@ function AdminPage() {
       }
       apply(result.settings);
       setSuccess("Runtime overrides cleared — values now come from the server environment.");
-
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : "Reset failed.");
     } finally {
