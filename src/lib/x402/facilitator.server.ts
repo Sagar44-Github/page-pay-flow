@@ -38,7 +38,8 @@ async function withTimeout<T>(operation: string, fn: () => Promise<T>): Promise<
       fn(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new FacilitatorTimeoutError(operation, `facilitator ${operation} timed out`)),
+          () =>
+            reject(new FacilitatorTimeoutError(operation, `facilitator ${operation} timed out`)),
           CALL_TIMEOUT_MS,
         );
       }),

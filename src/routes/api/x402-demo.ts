@@ -100,7 +100,11 @@ export const Route = createFileRoute("/api/x402-demo")({
           ? (body.mode as DemoMode)
           : "happy";
         const prompt = (body.prompt ?? "").trim();
-        logger.log("info", `POST /api/x402-demo received`, `mode=${mode} promptChars=${prompt.length}`);
+        logger.log(
+          "info",
+          `POST /api/x402-demo received`,
+          `mode=${mode} promptChars=${prompt.length}`,
+        );
 
         const paymentHeader = request.headers.get("x-payment");
 
@@ -193,7 +197,11 @@ export const Route = createFileRoute("/api/x402-demo")({
         logger.log("success", "Settlement confirmed", `txid=${transaction}`);
 
         try {
-          logger.log("info", "Calling Groq to produce the gated resource", `model=${body.model ?? GROQ_DEFAULT_MODEL}`);
+          logger.log(
+            "info",
+            "Calling Groq to produce the gated resource",
+            `model=${body.model ?? GROQ_DEFAULT_MODEL}`,
+          );
           const completion = await groqChat({
             ...(body.model ? { model: body.model } : {}),
             messages: [

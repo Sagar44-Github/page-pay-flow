@@ -88,9 +88,7 @@ export function encodePaymentHeader(payload: DemoPaymentPayload): string {
 
 export function decodePaymentHeader(header: string): DemoPaymentPayload {
   const json =
-    typeof atob === "function"
-      ? atob(header)
-      : Buffer.from(header, "base64").toString("utf8");
+    typeof atob === "function" ? atob(header) : Buffer.from(header, "base64").toString("utf8");
   return JSON.parse(json) as DemoPaymentPayload;
 }
 

@@ -34,17 +34,16 @@ export function Nav({ wallet }: { wallet: PeraWallet }) {
               </Button>
             </>
           ) : (
-            <Button size="sm" disabled={wallet.connecting} onClick={() => void wallet.connect()}>
-              {wallet.connecting ? "Connecting…" : "Connect Pera Wallet"}
-            </Button>
+            <span data-walkthrough="connect" className="rounded-md">
+              <Button size="sm" disabled={wallet.connecting} onClick={() => void wallet.connect()}>
+                {wallet.connecting ? "Connecting…" : "Connect Pera Wallet"}
+              </Button>
+            </span>
           )}
         </div>
       </div>
       {wallet.error && (
-        <p
-          className="mx-auto max-w-7xl px-6 pb-3 text-xs text-destructive"
-          role="alert"
-        >
+        <p className="mx-auto max-w-7xl px-6 pb-3 text-xs text-destructive" role="alert">
           {wallet.error}
         </p>
       )}

@@ -31,7 +31,8 @@ function fromEnv(): PagePayConfig {
     payTo: process.env["RESOURCE_PAY_TO"] ?? null,
     pricePerPageUsd: Number.isFinite(envPrice) && envPrice > 0 ? envPrice : PRICE_PER_PAGE_USD,
     facilitatorUrl: process.env["FACILITATOR_URL"] ?? DEFAULT_FACILITATOR_URL,
-    network: (process.env["X402_NETWORK"] as `${string}:${string}` | undefined) ?? ALGORAND_TESTNET_CAIP2,
+    network:
+      (process.env["X402_NETWORK"] as `${string}:${string}` | undefined) ?? ALGORAND_TESTNET_CAIP2,
   };
 }
 

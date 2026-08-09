@@ -7,7 +7,11 @@ import { z } from "zod";
 
 import { HttpExchangeView, type HttpExchange } from "@/components/x402demo/HttpExchangeView";
 import { LogConsole, type LogEntry, type LogLevel } from "@/components/x402demo/LogConsole";
-import { PaymentTimeline, type FlowStep, type StepState } from "@/components/x402demo/PaymentTimeline";
+import {
+  PaymentTimeline,
+  type FlowStep,
+  type StepState,
+} from "@/components/x402demo/PaymentTimeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -38,8 +42,16 @@ type FormValues = z.infer<typeof formSchema>;
 const STEP_DEFS = [
   { key: "request", label: "Unpaid request", hint: "POST /api/x402-demo — no X-Payment header" },
   { key: "challenge", label: "402 Payment Required", hint: "server returns payment requirements" },
-  { key: "construct", label: "X-Payment constructed", hint: "exact scheme payload, base64-encoded" },
-  { key: "authorize", label: "Payment authorized", hint: "payload verified by the resource server" },
+  {
+    key: "construct",
+    label: "X-Payment constructed",
+    hint: "exact scheme payload, base64-encoded",
+  },
+  {
+    key: "authorize",
+    label: "Payment authorized",
+    hint: "payload verified by the resource server",
+  },
   { key: "settle", label: "Settlement complete", hint: "facilitator confirms the transfer" },
   { key: "unlock", label: "Resource unlocked", hint: "Groq generates the gated content" },
 ] as const;
@@ -90,23 +102,20 @@ export default function X402DemoApp() {
     },
   });
 
-  const log = useCallback(
-    (level: LogLevel, source: string, message: string, detail?: string) => {
-      const id = uid("log");
-      setLogs((previous) => [
-        ...previous,
-        {
-          id,
-          timestamp: new Date().toISOString(),
-          level,
-          source,
-          message,
-          ...(detail ? { detail } : {}),
-        },
-      ]);
-    },
-    [],
-  );
+  const log = useCallback((level: LogLevel, source: string, message: string, detail?: string) => {
+    const id = uid("log");
+    setLogs((previous) => [
+      ...previous,
+      {
+        id,
+        timestamp: new Date().toISOString(),
+        level,
+        source,
+        message,
+        ...(detail ? { detail } : {}),
+      },
+    ]);
+  }, []);
 
   const setStep = useCallback((key: StepKey, state: StepState) => {
     setSteps((previous) => ({ ...previous, [key]: state }));
@@ -283,11 +292,7 @@ export default function X402DemoApp() {
         status: 402,
         statusText: "Payment Required",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          { error: "Payment failed", reason: "insufficient_funds" },
-          null,
-          2,
-        ),
+        body: JSON.stringify({ error: "Payment failed", reason: "insufficient_funds" }, null, 2),
       });
       log("error", "facilitator", "Settlement rejected", "insufficient_funds");
       setFailure("Settlement failed: insufficient_funds. Top up the wallet and retry.");
@@ -452,13 +457,12 @@ export default function X402DemoApp() {
         model: secondJson.model ?? values.model,
         latencyMs: secondJson.latencyMs ?? 0,
         usage: secondJson.usage,
-        settlement:
-          secondJson.settlement ?? {
-            success: true,
-            network: NETWORK,
-            transaction: "unknown",
-            payer: MOCK_PAYER,
-          },
+        settlement: secondJson.settlement ?? {
+          success: true,
+          network: NETWORK,
+          transaction: "unknown",
+          payer: MOCK_PAYER,
+        },
         simulated: false,
       });
       setStep("unlock", "done");
@@ -588,8 +592,8 @@ export default function X402DemoApp() {
                 </Button>
               </div>
               <p className="font-mono text-[11px] text-muted-foreground">
-                Test Mode mocks every step client-side. The live flow calls the real
-                /api/x402-demo route and Groq.
+                Test Mode mocks every step client-side. The live flow calls the real /api/x402-demo
+                route and Groq.
               </p>
             </div>
           </form>
