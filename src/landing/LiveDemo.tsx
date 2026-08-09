@@ -442,9 +442,9 @@ export function LiveDemo({
                     ) : (
                       "settled"
                     )
-                  ) : error ? (
+                  ) : exchange && !exchange.ok ? (
                     <span className="text-destructive">
-                      {exchange?.failureCode ?? "error"}
+                      {exchange.failureCode ?? "failed"}
                     </span>
                   ) : running ? (
                     "in progress…"
