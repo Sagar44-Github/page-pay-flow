@@ -34,9 +34,11 @@ export function Nav({ wallet }: { wallet: PeraWallet }) {
               </Button>
             </>
           ) : (
-            <Button size="sm" disabled={wallet.connecting} onClick={() => void wallet.connect()}>
-              {wallet.connecting ? "Connecting…" : "Connect Pera Wallet"}
-            </Button>
+            <span data-walkthrough="connect" className="rounded-md">
+              <Button size="sm" disabled={wallet.connecting} onClick={() => void wallet.connect()}>
+                {wallet.connecting ? "Connecting…" : "Connect Pera Wallet"}
+              </Button>
+            </span>
           )}
         </div>
       </div>
