@@ -6,7 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_PAGES, pagesForText, priceForPages } from "@/lib/pagepay/pricing";
 import type { PeraWallet } from "@/lib/wallet/pera";
-import { payAndFetch, safeJson, type PaidRequestResult } from "@/lib/x402/client";
+import {
+  TESTNET_DISPENSER_URL,
+  payAndFetch,
+  safeJson,
+  type PaidRequestResult,
+  type PaymentFailureCode,
+  type PaymentPhase,
+} from "@/lib/x402/client";
 
 interface Quote {
   pages: number;
@@ -27,9 +34,73 @@ interface SummaryResult {
   network?: string;
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+/** Friendly, actionable copy per detected failure cause. */
+type FriendlyError = { message: string; action?: "connect" | "fund" };
+
+const FAILURE_COPY: Record<PaymentFailureCode, FriendlyError> = {
+  cancelled: {
+    message: "Payment was cancelled in Pera Wallet. Tap “Pay and summarize” again when you're ready.",
+  },
+  insufficient_funds: {
+    message:
+      "Your wallet doesn't have enough testnet funds to cover this payment. Fund it from the Algorand testnet dispenser and try again.",
+    action: "fund",
+  },
+  requirements_unreadable: {
+    message:
+      "The server's 402 payment requirements couldn't be read. Check the raw payload in Protocol proof below.",
+  },
+  signing_failed: {
+    message:
+      "Pera Wallet couldn't sign the payment. Make sure Pera is unlocked and set to Algorand Testnet, then try again.",
+  },
+  verification_failed: {
+    message:
+      "Payment could not be verified on Algorand. This is usually temporary — wait a moment and try again.",
+  },
+  quote_mismatch: {
+    message:
+      "The price changed between the quote and the payment. Press “Get a price” again to refresh the quote, then pay.",
+  },
+  gateway_unavailable: {
+    message:
+      "The payment facilitator didn't respond in time. This is usually temporary — try again in a few seconds.",
+  },
+  network: {
+    message: "Lost connection while processing payment. Check your connection and try again.",
+  },
+  bad_request: {
+    message: "The document couldn't be read. Try a text-based PDF (not a scan) or paste the text.",
+  },
+  server_error: {
+    message:
+      "Something went wrong on the server after the request was sent. Check Protocol proof below for the raw response.",
+  },
+};
+
+const PHASE_LABEL: Record<PaymentPhase, string> = {
+  quoting: "requesting 402 quote",
+  awaiting_signature: "awaiting signature in Pera",
+  submitted: "payment submitted",
+  verifying: "verifying settlement",
+  settled: "settled",
+  failed: "failed",
+};
+
+function Card({
+  title,
+  children,
+  walkthrough,
+}: {
+  title: string;
+  children: React.ReactNode;
+  walkthrough?: string;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div
+      className="rounded-xl border border-border bg-card p-5 transition-shadow"
+      {...(walkthrough ? { "data-walkthrough": walkthrough } : {})}
+    >
       <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h3>
@@ -51,30 +122,59 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
+export function LiveDemo({
+  wallet,
+  onOpenWalkthrough,
+}: {
+  wallet: PeraWallet;
+  onOpenWalkthrough?: () => void;
+}) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [running, setRunning] = useState(false);
+  const [phase, setPhase] = useState<PaymentPhase | null>(null);
   const [exchange, setExchange] = useState<PaidRequestResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
 
   const localPages = file ? null : text.trim() ? pagesForText(text) : 0;
   const summary = exchange?.ok ? (exchange.result as SummaryResult) : null;
 
+  function fail(next: FriendlyError) {
+    setError(next);
+  }
+
+  /** Exact quote: the real file is POSTed so /api/price parses it like /api/summarize. */
   async function handleQuote() {
     setError(null);
     setQuoting(true);
     try {
-      const words = text.trim().split(/\s+/).filter(Boolean).length;
-      const query = file ? "pages=1" : `words=${words}`;
-      const response = await fetch(`/api/price?${query}`);
+      const init: RequestInit = file
+        ? (() => {
+            const form = new FormData();
+            form.set("file", file);
+            return { method: "POST", body: form };
+          })()
+        : {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ text }),
+          };
+      if (!file && !text.trim()) {
+        fail({ message: "Add a document or paste some text first." });
+        return;
+      }
+      const response = await fetch("/api/price", init);
       const body = (await response.json()) as Quote;
-      if (!response.ok) throw new Error(body.reason ?? "Quote failed");
+      if (!response.ok) {
+        fail({ message: body.reason ?? "The document couldn't be priced." });
+        return;
+      }
       setQuote(body);
     } catch (quoteError) {
-      setError(quoteError instanceof Error ? quoteError.message : String(quoteError));
+      console.error("[pagepay] quote failed", quoteError);
+      fail({ message: "Couldn't reach the pricing endpoint. Check your connection and retry." });
     } finally {
       setQuoting(false);
     }
@@ -83,12 +183,14 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
   async function handlePayAndSummarize() {
     setError(null);
     setExchange(null);
+    setPhase(null);
+
     if (!wallet.signer) {
-      setError("Connect Pera Wallet on Algorand Testnet first.");
+      fail({ message: "Connect Pera Wallet in the header first.", action: "connect" });
       return;
     }
     if (!file && !text.trim()) {
-      setError("Add a document or paste some text.");
+      fail({ message: "Add a document or paste some text." });
       return;
     }
 
@@ -106,31 +208,59 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
             body: JSON.stringify({ text }),
           };
 
-      const result = await payAndFetch("/api/summarize", init, wallet.signer);
+      const result = await payAndFetch("/api/summarize", init, wallet.signer, {
+        ...(quote ? { expectedPages: quote.pages } : {}),
+        onPhase: setPhase,
+      });
       setExchange(result);
-      if (result.error) setError(result.error);
+      if (!result.ok) {
+        console.error("[pagepay] payment failed", result.failureCode, result.error, result);
+        const friendly = result.failureCode ? FAILURE_COPY[result.failureCode] : undefined;
+        fail(
+          friendly ?? {
+            message: "The payment couldn't be completed. See Protocol proof below for details.",
+          },
+        );
+      }
     } catch (runError) {
-      setError(runError instanceof Error ? runError.message : String(runError));
+      console.error("[pagepay] unexpected payment error", runError);
+      setPhase("failed");
+      fail({
+        message:
+          "The payment couldn't be completed because of an unexpected error. Details are in the browser console.",
+      });
     } finally {
       setRunning(false);
     }
   }
 
   const quotedBody = exchange?.unpaid ? safeJson(exchange.unpaid.body) : null;
+  const detectedPages = exchange?.quotedPages ?? quote?.pages ?? (localPages || null);
+  const quotedPrice = exchange?.quotedPrice ?? quote?.price ?? null;
+  const paymentStatus: PaymentPhase | "not_started" = phase ?? "not_started";
 
   return (
     <section id="live-demo" className="border-b border-border bg-card/20">
       <div className="mx-auto max-w-7xl px-6 py-12">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Live flow · real 402, real payment
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Every response below comes from the live backend. Testnet funds only.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Live flow · real 402, real payment
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Every response below comes from the live backend. Testnet funds only.
+            </p>
+          </div>
+          {onOpenWalkthrough && (
+            <Button variant="secondary" size="sm" onClick={onOpenWalkthrough}>
+              ? How it works
+            </Button>
+          )}
+        </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
           <div className="space-y-6">
-            <Card title="1 · Document">
+            <Card title="1 · Document" walkthrough="document">
               <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:border-primary/50">
                 <span className="text-sm font-medium text-card-foreground">
                   {file ? file.name : "Choose a PDF or .txt"}
@@ -180,16 +310,29 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                   ≈ {localPages} page{localPages === 1 ? "" : "s"} · {priceForPages(localPages)}
                 </p>
               )}
+              {file && (
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                  page count is read from the PDF itself when you press “Get a price”
+                </p>
+              )}
             </Card>
 
             <Card title="2 · Price &amp; payment">
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" disabled={quoting} onClick={() => void handleQuote()}>
-                  {quoting ? "Pricing…" : "Get a price"}
-                </Button>
-                <Button disabled={running} onClick={() => void handlePayAndSummarize()}>
-                  {running ? "Paying…" : "Pay and summarize"}
-                </Button>
+                <span data-walkthrough="quote" className="rounded-md">
+                  <Button
+                    variant="secondary"
+                    disabled={quoting}
+                    onClick={() => void handleQuote()}
+                  >
+                    {quoting ? "Pricing…" : "Get a price"}
+                  </Button>
+                </span>
+                <span data-walkthrough="pay" className="rounded-md">
+                  <Button disabled={running} onClick={() => void handlePayAndSummarize()}>
+                    {running ? "Paying…" : "Pay and summarize"}
+                  </Button>
+                </span>
               </div>
 
               {quote && (
@@ -207,18 +350,38 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                 </p>
               )}
               {error && (
-                <p
+                <div
                   className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                   role="alert"
                 >
-                  {error}
-                </p>
+                  <p>{error.message}</p>
+                  {error.action === "connect" && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => void wallet.connect()}
+                    >
+                      Connect Pera Wallet
+                    </Button>
+                  )}
+                  {error.action === "fund" && (
+                    <a
+                      className="mt-2 inline-block font-mono text-[11px] underline underline-offset-2"
+                      href={TESTNET_DISPENSER_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      open the Algorand testnet dispenser →
+                    </a>
+                  )}
+                </div>
               )}
             </Card>
           </div>
 
           <div className="space-y-6">
-            <Card title="3 · Summary">
+            <Card title="3 · Summary" walkthrough="summary">
               {summary?.summary ? (
                 <>
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
@@ -250,6 +413,49 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                   Your summary appears here once the payment settles.
                 </p>
               )}
+            </Card>
+
+            <Card title="Request status">
+              <div>
+                <Row label="Pages detected">{detectedPages ?? "—"}</Row>
+                <Row label="Price quoted">{quotedPrice ?? "—"}</Row>
+                <Row label="Payment">
+                  {paymentStatus === "not_started" ? (
+                    "not started"
+                  ) : (
+                    <span className={paymentStatus === "failed" ? "text-destructive" : ""}>
+                      {PHASE_LABEL[paymentStatus]}
+                    </span>
+                  )}
+                </Row>
+                <Row label="Outcome">
+                  {summary?.summary ? (
+                    summary.explorer ? (
+                      <a
+                        className="text-primary underline-offset-2 hover:underline"
+                        href={summary.explorer}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        settled · {summary.txId}
+                      </a>
+                    ) : (
+                      "settled"
+                    )
+                  ) : error ? (
+                    <span className="text-destructive">
+                      {exchange?.failureCode ?? "error"}
+                    </span>
+                  ) : running ? (
+                    "in progress…"
+                  ) : (
+                    "—"
+                  )}
+                </Row>
+              </div>
+              <p className="mt-3 font-mono text-[11px] text-muted-foreground">
+                driven entirely by this request's live frontend state
+              </p>
             </Card>
 
             {exchange && (
