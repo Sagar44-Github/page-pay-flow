@@ -38,12 +38,6 @@ function matches(input: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-async function useUnlockedSession() {
-  const session = await useSession<AdminSession>(sessionConfig());
-  if (!session.data.unlocked) throw new Error("Locked");
-  return session;
-}
-
 async function snapshot(): Promise<AdminSettings> {
   const { getConfig, overriddenKeys } = await import("@/lib/pagepay/config.server");
   const config = getConfig();
@@ -94,7 +88,9 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    await useUnlockedSession();
+    const session = await useSession<AdminSession>(sessionConfig());
+    if (!session.data.unlocked)
+      return { ok: false as const, error: "Locked — enter the passphrase." };
     const { updateConfig, validatePatch } = await import("@/lib/pagepay/config.server");
     const { resetResourceServer } = await import("@/lib/x402/routeConfig.server");
 
