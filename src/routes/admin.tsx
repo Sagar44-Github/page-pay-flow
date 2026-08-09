@@ -249,9 +249,7 @@ function AdminPage() {
                     step="0.001"
                     min="0.001"
                     value={form.pricePerPageUsd}
-                    onChange={(event) =>
-                      setForm({ ...form, pricePerPageUsd: event.target.value })
-                    }
+                    onChange={(event) => setForm({ ...form, pricePerPageUsd: event.target.value })}
                     className="mt-1 font-mono text-xs"
                   />
                 </div>
@@ -262,9 +260,7 @@ function AdminPage() {
                   <Input
                     id="facilitator"
                     value={form.facilitatorUrl}
-                    onChange={(event) =>
-                      setForm({ ...form, facilitatorUrl: event.target.value })
-                    }
+                    onChange={(event) => setForm({ ...form, facilitatorUrl: event.target.value })}
                     className="mt-1 font-mono text-xs"
                   />
                 </div>

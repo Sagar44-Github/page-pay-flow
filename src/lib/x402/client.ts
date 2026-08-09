@@ -62,12 +62,7 @@ export type PaymentFailureCode =
 
 /** Lifecycle stage of the payment, reported live to the UI. */
 export type PaymentPhase =
-  | "quoting"
-  | "awaiting_signature"
-  | "submitted"
-  | "verifying"
-  | "settled"
-  | "failed";
+  "quoting" | "awaiting_signature" | "submitted" | "verifying" | "settled" | "failed";
 
 export interface PaidRequestResult {
   ok: boolean;
@@ -98,12 +93,8 @@ function readQuote(body: unknown): QuoteFields {
   if (!body || typeof body !== "object") return {};
   const record = body as Record<string, unknown>;
   return {
-    ...(typeof record["pagesQuoted"] === "number"
-      ? { pagesQuoted: record["pagesQuoted"] }
-      : {}),
-    ...(typeof record["priceQuoted"] === "string"
-      ? { priceQuoted: record["priceQuoted"] }
-      : {}),
+    ...(typeof record["pagesQuoted"] === "number" ? { pagesQuoted: record["pagesQuoted"] } : {}),
+    ...(typeof record["priceQuoted"] === "string" ? { priceQuoted: record["priceQuoted"] } : {}),
   };
 }
 

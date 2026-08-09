@@ -20,9 +20,9 @@ export function Hero({ onTryIt }: { onTryIt: () => void }) {
           Pay-per-page AI summaries, settled over HTTP 402.
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Submit a document, receive a machine-readable 402 quote, sign one payment from Pera
-          Wallet on Algorand Testnet, and get the summary back on the retried request. No
-          accounts, no subscriptions, no minimums.
+          Submit a document, receive a machine-readable 402 quote, sign one payment from Pera Wallet
+          on Algorand Testnet, and get the summary back on the retried request. No accounts, no
+          subscriptions, no minimums.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button onClick={onTryIt}>Try the live flow</Button>

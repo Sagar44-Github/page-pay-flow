@@ -112,13 +112,10 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
       paymentStatus: status === 402 ? "required" : "failed",
       outcome: status === 402 ? "payment_required" : "payment_failed",
     });
-    return new Response(
-      typeof body === "string" ? body : JSON.stringify(body ?? {}, null, 2),
-      {
-        status,
-        headers: { "content-type": "application/json", ...headers },
-      },
-    );
+    return new Response(typeof body === "string" ? body : JSON.stringify(body ?? {}, null, 2), {
+      status,
+      headers: { "content-type": "application/json", ...headers },
+    });
   }
 
   if (processed.type === "no-payment-required") {
@@ -196,7 +193,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
       price: priceQuoted,
       paymentStatus: "settled",
       outcome: "summarized",
-      ...(settlement.payer ?? payer ? { payer: (settlement.payer ?? payer) as string } : {}),
+      ...((settlement.payer ?? payer) ? { payer: (settlement.payer ?? payer) as string } : {}),
       txId,
     });
     return json(

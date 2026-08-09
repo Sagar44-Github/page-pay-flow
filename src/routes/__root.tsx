@@ -79,10 +79,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "PagePay — pay-per-page AI summaries over x402" },
-      { name: "description", content: "Pay-per-page AI document summarization settled on Algorand Testnet via the x402 protocol." },
+      {
+        name: "description",
+        content:
+          "Pay-per-page AI document summarization settled on Algorand Testnet via the x402 protocol.",
+      },
       { name: "author", content: "PagePay" },
       { property: "og:title", content: "PagePay — pay-per-page AI summaries over x402" },
-      { property: "og:description", content: "Pay-per-page AI document summarization settled on Algorand Testnet via the x402 protocol." },
+      {
+        property: "og:description",
+        content:
+          "Pay-per-page AI document summarization settled on Algorand Testnet via the x402 protocol.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },

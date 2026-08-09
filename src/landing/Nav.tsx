@@ -43,10 +43,7 @@ export function Nav({ wallet }: { wallet: PeraWallet }) {
         </div>
       </div>
       {wallet.error && (
-        <p
-          className="mx-auto max-w-7xl px-6 pb-3 text-xs text-destructive"
-          role="alert"
-        >
+        <p className="mx-auto max-w-7xl px-6 pb-3 text-xs text-destructive" role="alert">
           {wallet.error}
         </p>
       )}

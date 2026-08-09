@@ -38,7 +38,7 @@ function matches(input: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-async function requireUnlocked() {
+async function useUnlockedSession() {
   const session = await useSession<AdminSession>(sessionConfig());
   if (!session.data.unlocked) throw new Error("Locked");
   return session;
@@ -94,7 +94,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    await requireUnlocked();
+    await useUnlockedSession();
     const { updateConfig, validatePatch } = await import("@/lib/pagepay/config.server");
     const { resetResourceServer } = await import("@/lib/x402/routeConfig.server");
 
@@ -103,9 +103,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
       ...(data.pricePerPageUsd !== undefined
         ? { pricePerPageUsd: Number(data.pricePerPageUsd) }
         : {}),
-      ...(data.facilitatorUrl !== undefined
-        ? { facilitatorUrl: data.facilitatorUrl.trim() }
-        : {}),
+      ...(data.facilitatorUrl !== undefined ? { facilitatorUrl: data.facilitatorUrl.trim() } : {}),
       ...(data.network !== undefined
         ? { network: data.network.trim() as `${string}:${string}` }
         : {}),
@@ -121,7 +119,7 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
   });
 
 export const adminResetSettings = createServerFn({ method: "POST" }).handler(async () => {
-  await requireUnlocked();
+  await useUnlockedSession();
   const { resetConfig } = await import("@/lib/pagepay/config.server");
   const { resetResourceServer } = await import("@/lib/x402/routeConfig.server");
   resetConfig();

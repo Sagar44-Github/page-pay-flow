@@ -38,9 +38,10 @@ export async function groqChat(options: {
   const apiKey = process.env["GROQ_API_KEY"];
   if (!apiKey) throw new GroqError("GROQ_API_KEY is not configured.", 500);
 
-  const model = options.model && GROQ_MODELS.includes(options.model as GroqModel)
-    ? options.model
-    : GROQ_DEFAULT_MODEL;
+  const model =
+    options.model && GROQ_MODELS.includes(options.model as GroqModel)
+      ? options.model
+      : GROQ_DEFAULT_MODEL;
 
   const startedAt = Date.now();
   let response: Response;

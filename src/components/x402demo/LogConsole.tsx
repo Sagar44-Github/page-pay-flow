@@ -66,9 +66,7 @@ export function LogConsole({ entries, onClear }: { entries: LogEntry[]; onClear:
             <span className="shrink-0 text-muted-foreground">[{entry.source}]</span>
             <span className="min-w-0 break-words text-foreground/90">
               {entry.message}
-              {entry.detail && (
-                <span className="text-muted-foreground"> — {entry.detail}</span>
-              )}
+              {entry.detail && <span className="text-muted-foreground"> — {entry.detail}</span>}
             </span>
           </div>
         ))}

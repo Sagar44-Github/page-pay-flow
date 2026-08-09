@@ -79,13 +79,7 @@ export function useWalkthrough() {
   return { open, setOpen, close };
 }
 
-export function Walkthrough({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function Walkthrough({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const step = STEPS[index]!;
 

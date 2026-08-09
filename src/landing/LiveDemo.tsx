@@ -39,7 +39,8 @@ type FriendlyError = { message: string; action?: "connect" | "fund" };
 
 const FAILURE_COPY: Record<PaymentFailureCode, FriendlyError> = {
   cancelled: {
-    message: "Payment was cancelled in Pera Wallet. Tap “Pay and summarize” again when you're ready.",
+    message:
+      "Payment was cancelled in Pera Wallet. Tap “Pay and summarize” again when you're ready.",
   },
   insufficient_funds: {
     message:
@@ -279,12 +280,7 @@ export function LiveDemo({
                 />
               </label>
               {file && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => setFile(null)}
-                >
+                <Button variant="ghost" size="sm" className="mt-2" onClick={() => setFile(null)}>
                   Remove file
                 </Button>
               )}
@@ -320,11 +316,7 @@ export function LiveDemo({
             <Card title="2 · Price &amp; payment">
               <div className="flex flex-wrap gap-2">
                 <span data-walkthrough="quote" className="rounded-md">
-                  <Button
-                    variant="secondary"
-                    disabled={quoting}
-                    onClick={() => void handleQuote()}
-                  >
+                  <Button variant="secondary" disabled={quoting} onClick={() => void handleQuote()}>
                     {quoting ? "Pricing…" : "Get a price"}
                   </Button>
                 </span>
@@ -443,9 +435,7 @@ export function LiveDemo({
                       "settled"
                     )
                   ) : exchange && !exchange.ok ? (
-                    <span className="text-destructive">
-                      {exchange.failureCode ?? "failed"}
-                    </span>
+                    <span className="text-destructive">{exchange.failureCode ?? "failed"}</span>
                   ) : running ? (
                     "in progress…"
                   ) : (
@@ -461,10 +451,7 @@ export function LiveDemo({
             {exchange && (
               <Card title="Protocol proof · raw payloads">
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-[11px]"
-                  >
+                  <Badge variant="outline" className="font-mono text-[11px]">
                     {exchange.unpaid.status} {exchange.unpaid.statusText}
                   </Badge>
                   <span className="font-mono text-[11px] text-muted-foreground">

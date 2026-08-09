@@ -8,12 +8,7 @@
  */
 
 export type PaymentStatus =
-  | "none"
-  | "required"
-  | "verified"
-  | "settled"
-  | "failed"
-  | "gateway_timeout";
+  "none" | "required" | "verified" | "settled" | "failed" | "gateway_timeout";
 
 export type Outcome =
   | "quoted"

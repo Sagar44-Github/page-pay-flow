@@ -59,7 +59,10 @@ export const Route = createFileRoute("/api/price")({
         } else if (wordsParam !== null) {
           const words = Number(wordsParam);
           if (!Number.isFinite(words) || words < 0) {
-            return json({ error: "Bad request", reason: "`words` must be a positive number." }, 400);
+            return json(
+              { error: "Bad request", reason: "`words` must be a positive number." },
+              400,
+            );
           }
           pages = Math.max(1, Math.ceil(words / WORDS_PER_PAGE));
         }
