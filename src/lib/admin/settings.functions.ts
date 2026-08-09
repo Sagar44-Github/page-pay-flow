@@ -115,7 +115,11 @@ export const adminSaveSettings = createServerFn({ method: "POST" })
   });
 
 export const adminResetSettings = createServerFn({ method: "POST" }).handler(async () => {
-  await useUnlockedSession();
+  const session = await useSession<AdminSession>(sessionConfig());
+  if (!session.data.unlocked) {
+    return { ok: false as const, error: "Locked — enter the passphrase." };
+  }
+
   const { resetConfig } = await import("@/lib/pagepay/config.server");
   const { resetResourceServer } = await import("@/lib/x402/routeConfig.server");
   resetConfig();
