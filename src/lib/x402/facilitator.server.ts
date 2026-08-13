@@ -79,11 +79,19 @@ export class ResilientFacilitatorClient implements FacilitatorClient {
   }
 
   verify(payload: PaymentPayload, requirements: PaymentRequirements): Promise<VerifyResponse> {
-    return withTimeoutAndRetry("verify", () => this.inner.verify(payload, requirements));
+    return withTimeoutAndRetry("verify", async () => {
+      const result = await this.inner.verify(payload, requirements);
+      console.log("[pagepay] facilitator verify response", JSON.stringify(result, null, 2));
+      return result;
+    });
   }
 
   settle(payload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> {
-    return withTimeoutAndRetry("settle", () => this.inner.settle(payload, requirements));
+    return withTimeoutAndRetry("settle", async () => {
+      const result = await this.inner.settle(payload, requirements);
+      console.log("[pagepay] facilitator settle response", JSON.stringify(result, null, 2));
+      return result;
+    });
   }
 
   getSupported(): Promise<SupportedResponse> {

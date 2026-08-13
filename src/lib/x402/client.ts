@@ -119,8 +119,25 @@ export async function payAndFetch(
   const phase = options.onPhase ?? (() => {});
 
   phase("quoting");
-  const first = await fetch(url, init);
+  let first: Response;
+  try {
+    first = await fetch(url, init);
+  } catch (error) {
+    const raw = message(error);
+    console.error("[pagepay] initial fetch failed", raw, error);
+    phase("failed");
+    return {
+      ok: false,
+      unpaid: { status: 0, statusText: "Network Error", headers: {}, body: "" },
+      error:
+        /failed to fetch|network|reset|refused|abort/i.test(raw)
+          ? "Could not reach the server. If you're running locally, make sure `npm run dev` is running and open http://localhost:8080 (keep the terminal open)."
+          : raw,
+      failureCode: "network",
+    };
+  }
   const unpaid = await capture(first);
+  console.log("[pagepay] initial response", unpaid);
   const firstBody = safeJson(unpaid.body);
   const quote = readQuote(firstBody);
   const quoteFields = {
@@ -186,11 +203,17 @@ export async function payAndFetch(
   }
 
   phase("awaiting_signature");
-  let paymentHeaders: Record<string, string> | null;
+  console.log("[pagepay] payment required (402 quote)", JSON.stringify(paymentRequired, null, 2));
+
+  let paymentHeaders: Record<string, string>;
   try {
-    paymentHeaders = await httpClient.handlePaymentRequired(paymentRequired);
+    const paymentPayload = await httpClient.createPaymentPayload(paymentRequired);
+    console.log("[pagepay] payment payload signed", JSON.stringify(paymentPayload, null, 2));
+    paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
+    console.log("[pagepay] payment headers for retry", paymentHeaders);
   } catch (error) {
     const raw = message(error);
+    console.error("[pagepay] signing failed", raw, error);
     phase("failed");
     return {
       ok: false,
@@ -198,17 +221,6 @@ export async function payAndFetch(
       paymentRequired,
       error: raw,
       failureCode: classifySigningError(raw),
-      ...quoteFields,
-    };
-  }
-  if (!paymentHeaders) {
-    phase("failed");
-    return {
-      ok: false,
-      unpaid,
-      paymentRequired,
-      error: "Payment was cancelled before signing.",
-      failureCode: "cancelled",
       ...quoteFields,
     };
   }
@@ -233,6 +245,7 @@ export async function payAndFetch(
   }
   phase("verifying");
   const paid = await capture(second);
+  console.log("[pagepay] paid retry response", paid);
   const paidBody = safeJson(paid.body);
 
   let settlement: SettleResponse | undefined;
@@ -259,6 +272,8 @@ export async function payAndFetch(
     paidBody && typeof paidBody === "object"
       ? String((paidBody as Record<string, unknown>)["reason"] ?? "")
       : "";
+  const headerReason = readVerifyFailureReason(paid.headers);
+  const combinedReason = headerReason || paidReason;
   let failureCode: PaymentFailureCode;
   if (second.status === 504) failureCode = "gateway_unavailable";
   else if (second.status === 400) failureCode = "bad_request";
@@ -270,7 +285,7 @@ export async function payAndFetch(
       paidQuote.pagesQuoted !== quote.pagesQuoted
     ) {
       failureCode = "quote_mismatch";
-    } else if (/insufficient|balance|underflow|overspend/i.test(paidReason)) {
+    } else if (/insufficient|balance|underflow|overspend|asset 10458941 missing|missing from/i.test(combinedReason)) {
       failureCode = "insufficient_funds";
     } else {
       failureCode = "verification_failed";
@@ -285,7 +300,7 @@ export async function payAndFetch(
     paid,
     ...(settlement ? { settlement } : {}),
     result: paidBody,
-    error: paidReason || `Server returned ${second.status} after payment`,
+    error: combinedReason || `Server returned ${second.status} after payment`,
     failureCode,
     ...quoteFields,
   };
@@ -296,6 +311,17 @@ export function safeJson(text: string): unknown {
     return JSON.parse(text);
   } catch {
     return text;
+  }
+}
+
+function readVerifyFailureReason(headers: Record<string, string>): string {
+  const encoded = headers["payment-required"];
+  if (!encoded) return "";
+  try {
+    const decoded = JSON.parse(atob(encoded)) as { error?: string };
+    return decoded.error ?? "";
+  } catch {
+    return "";
   }
 }
 

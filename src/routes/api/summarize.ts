@@ -84,7 +84,13 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
 
   let processed;
   try {
+    console.log("[pagepay] verifying payment", {
+      hasPaymentSignature: !!request.headers.get("payment-signature"),
+      pageCount: doc.pages,
+      priceQuoted,
+    });
     processed = await server.processHTTPRequest(context);
+    console.log("[pagepay] verify result", processed.type);
   } catch (error) {
     const timedOut = error instanceof FacilitatorTimeoutError;
     const misconfigured = error instanceof MissingPayToError;
@@ -141,12 +147,20 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
   // 3. Settle on-chain before doing paid work.
   let settlement;
   try {
+    console.log("[pagepay] settling payment", {
+      payer,
+      amountAtomic,
+      asset: paymentRequirements.asset,
+      payTo: paymentRequirements.payTo,
+      network: paymentRequirements.network,
+    });
     settlement = await server.processSettlement(
       paymentPayload,
       paymentRequirements,
       declaredExtensions,
       { request: context },
     );
+    console.log("[pagepay] settlement result", JSON.stringify(settlement, null, 2));
   } catch (error) {
     const timedOut = error instanceof FacilitatorTimeoutError;
     const reason = error instanceof Error ? error.message : String(error);

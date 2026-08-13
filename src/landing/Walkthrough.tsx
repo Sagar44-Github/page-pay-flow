@@ -21,7 +21,7 @@ const STEPS = [
   {
     target: "connect",
     title: "1 · Connect Pera Wallet",
-    body: "Use “Connect Pera Wallet” in the header. PagePay is Algorand Testnet only, so switch Pera to Testnet and keep a little testnet ALGO for fees.",
+    body: "Use “Connect Pera Wallet” in the header. On desktop, scan the QR with the Pera mobile app or use Pera Web at web.perawallet.app. Switch to Testnet and keep testnet USDC (not just ALGO) for payments.",
   },
   {
     target: "document",

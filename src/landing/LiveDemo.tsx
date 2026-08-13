@@ -44,7 +44,7 @@ const FAILURE_COPY: Record<PaymentFailureCode, FriendlyError> = {
   },
   insufficient_funds: {
     message:
-      "Your wallet doesn't have enough testnet funds to cover this payment. Fund it from the Algorand testnet dispenser and try again.",
+      "Your wallet needs testnet USDC (ASA 10458941) for the payment, plus a little testnet ALGO for fees. ALGO alone is not enough — get testnet USDC from a faucet, then retry.",
     action: "fund",
   },
   requirements_unreadable: {
@@ -53,7 +53,7 @@ const FAILURE_COPY: Record<PaymentFailureCode, FriendlyError> = {
   },
   signing_failed: {
     message:
-      "Pera Wallet couldn't sign the payment. Make sure Pera is unlocked and set to Algorand Testnet, then try again.",
+      "Pera Wallet couldn't sign the payment. On desktop Chrome/Edge, look for a new tab at web.perawallet.app and approve the USDC transfer — or scan the QR with the Pera mobile app. Make sure Pera is on Testnet.",
   },
   verification_failed: {
     message:

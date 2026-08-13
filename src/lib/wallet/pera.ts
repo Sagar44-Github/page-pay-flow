@@ -69,7 +69,7 @@ export function usePeraWallet(): PeraWallet {
       setError(
         /cancel|close/i.test(message)
           ? "Pera connection was cancelled."
-          : `Couldn't reach Pera Wallet on Algorand Testnet. Install Pera (mobile or extension), switch it to Testnet, then retry. (${message})`,
+          : `Couldn't reach Pera Wallet on Algorand Testnet. On desktop use Pera Web (web.perawallet.app) or scan the QR with the Pera mobile app. (${message})`,
       );
     } finally {
       setConnecting(false);
@@ -92,11 +92,47 @@ export function usePeraWallet(): PeraWallet {
       address,
       async signTransactions(txns: Uint8Array[], indexesToSign?: number[]) {
         const indexes = indexesToSign ?? txns.map((_, index) => index);
+        const pera = getPera();
+        console.log("[pagepay] pera signTransactions", {
+          txnCount: txns.length,
+          indexes,
+          platform: pera.platform,
+          connected: pera.isConnected,
+        });
+
         const group = txns.map((bytes, index) => {
           const txn = algosdk.decodeUnsignedTransaction(bytes);
-          return indexes.includes(index) ? { txn } : { txn, signers: [] };
+          if (indexes.includes(index)) {
+            return { txn, signers: [address] };
+          }
+          return { txn, signers: [] };
         });
-        const signed = await getPera().signTransaction([group], address);
+
+        let signed: Uint8Array[];
+        try {
+          // Omit signerAddress — each slot already declares signers explicitly (ARC-0001).
+          signed = await Promise.race([
+            pera.signTransaction([group]),
+            new Promise<never>((_, reject) => {
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      "Pera Wallet did not respond within 2 minutes. " +
+                        "On desktop, a new tab should open at web.perawallet.app — approve the USDC transfer there. " +
+                        "Or scan the QR with the Pera mobile app. Do not use Cursor's built-in browser; use Chrome or Edge.",
+                    ),
+                  ),
+                120_000,
+              );
+            }),
+          ]);
+        } catch (signError) {
+          console.error("[pagepay] pera signTransaction failed", signError);
+          throw signError;
+        }
+
+        console.log("[pagepay] pera signed count", signed.length, "expected", indexes.length);
         const queue = [...signed];
         return txns.map((_, index) => (indexes.includes(index) ? (queue.shift() ?? null) : null));
       },
