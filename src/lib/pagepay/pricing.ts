@@ -11,6 +11,40 @@ export const MAX_PAGES = 20;
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_TEXT_CHARS = 400_000;
 
+/** Number of document pages grouped into a single payable chunk. */
+export const PAGES_PER_CHUNK = 2;
+
+export interface ChunkInfo {
+  /** 0-based chunk index. */
+  chunkIndex: number;
+  /** Total number of chunks for this document. */
+  totalChunks: number;
+  /** Number of pages in THIS chunk (may be < PAGES_PER_CHUNK for the last chunk). */
+  chunkPages: number;
+  /** 0-indexed start page (inclusive). */
+  startPage: number;
+  /** 0-indexed end page (exclusive). */
+  endPage: number;
+  /** Whether more chunks remain after this one. */
+  hasMore: boolean;
+}
+
+/** Compute chunk metadata for a given document size and chunk index. */
+export function chunkInfoForDocument(totalPages: number, chunkIndex: number): ChunkInfo {
+  const totalChunks = Math.max(1, Math.ceil(totalPages / PAGES_PER_CHUNK));
+  const clamped = Math.max(0, Math.min(chunkIndex, totalChunks - 1));
+  const startPage = clamped * PAGES_PER_CHUNK;
+  const endPage = Math.min(startPage + PAGES_PER_CHUNK, totalPages);
+  return {
+    chunkIndex: clamped,
+    totalChunks,
+    chunkPages: endPage - startPage,
+    startPage,
+    endPage,
+    hasMore: clamped < totalChunks - 1,
+  };
+}
+
 /** Page count for a raw text chunk: ceil(words / 500), minimum 1. */
 export function pagesForText(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;

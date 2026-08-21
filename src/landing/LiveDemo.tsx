@@ -1,10 +1,21 @@
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { Bot, Layers, FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_PAGES, pagesForText, priceForPages } from "@/lib/pagepay/pricing";
+import { Container } from "@/components/marketing/Container";
+import { MarkdownContent } from "@/components/marketing/MarkdownContent";
+import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { ChunkDemo } from "@/landing/ChunkDemo";
+import { CurlExportButton } from "@/components/hackathon/CurlExportButton";
+import {
+  PaymentHeaderInspector,
+  pickPaymentHeaders,
+} from "@/components/hackathon/PaymentHeaderInspector";
 import type { PeraWallet } from "@/lib/wallet/pera";
 import {
   TESTNET_DISPENSER_URL,
@@ -132,6 +143,7 @@ export function LiveDemo({
 }) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<"all" | "chunk">("all");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [running, setRunning] = useState(false);
@@ -235,23 +247,45 @@ export function LiveDemo({
     }
   }
 
+  async function handleAgentAutopay() {
+    if (!file && !text.trim()) {
+      fail({ message: "Add a document or paste text first." });
+      return;
+    }
+    if (!wallet.signer) {
+      fail({
+        message: "Connect Pera Wallet — or use Protocol demo with Judge wallet (no Pera).",
+        action: "connect",
+      });
+      return;
+    }
+    if (!quote) await handleQuote();
+    await handlePayAndSummarize();
+  }
+
   const quotedBody = exchange?.unpaid ? safeJson(exchange.unpaid.body) : null;
   const detectedPages = exchange?.quotedPages ?? quote?.pages ?? (localPages || null);
   const quotedPrice = exchange?.quotedPrice ?? quote?.price ?? null;
   const paymentStatus: PaymentPhase | "not_started" = phase ?? "not_started";
 
+  const headerPick = exchange
+    ? {
+        ...pickPaymentHeaders(exchange.unpaid.headers),
+        ...(exchange.paid ? pickPaymentHeaders(exchange.paid.headers) : {}),
+      }
+    : null;
+
+  const retryBody = file ? undefined : JSON.stringify({ text });
+
   return (
-    <section id="live-demo" className="border-b border-border bg-card/20">
-      <div className="mx-auto max-w-7xl px-6 py-12">
+    <section id="live-demo" className="border-b border-border py-20 md:py-24">
+      <Container>
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Live flow · real 402, real payment
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Every response below comes from the live backend. Testnet funds only.
-            </p>
-          </div>
+          <SectionHeading
+            eyebrow="Live demo"
+            title="Real 402, real payment, real summary"
+            description="Every response below comes from the live backend. Testnet USDC only."
+          />
           {onOpenWalkthrough && (
             <Button variant="secondary" size="sm" onClick={onOpenWalkthrough}>
               ? How it works
@@ -261,6 +295,35 @@ export function LiveDemo({
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
           <div className="space-y-6">
+            {/* ── Mode toggle ── */}
+            <Card title="Mode">
+              <div className="flex gap-2">
+                <Button
+                  variant={mode === "all" ? "default" : "secondary"}
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setMode("all")}
+                >
+                  <FileText className="size-4" />
+                  Summarize all at once
+                </Button>
+                <Button
+                  variant={mode === "chunk" ? "default" : "secondary"}
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setMode("chunk")}
+                >
+                  <Layers className="size-4" />
+                  Chunk by chunk
+                </Button>
+              </div>
+              <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                {mode === "all"
+                  ? "Pay once for the entire document summary."
+                  : "Pay per chunk — stop any time and only pay for what you've read."}
+              </p>
+            </Card>
+
             <Card title="1 · Document" walkthrough="document">
               <label className="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:border-primary/50">
                 <span className="text-sm font-medium text-card-foreground">
@@ -325,6 +388,15 @@ export function LiveDemo({
                     {running ? "Paying…" : "Pay and summarize"}
                   </Button>
                 </span>
+                <Button
+                  variant="secondary"
+                  disabled={running}
+                  className="gap-2"
+                  onClick={() => void handleAgentAutopay()}
+                >
+                  <Bot className="size-4" />
+                  Run as agent
+                </Button>
               </div>
 
               {quote && (
@@ -372,13 +444,21 @@ export function LiveDemo({
             </Card>
           </div>
 
+          {mode === "chunk" ? (
+            <ChunkDemo
+              wallet={wallet}
+              totalPages={quote?.pages ?? (localPages || 0)}
+              file={file}
+              text={text}
+            />
+          ) : (
           <div className="space-y-6">
             <Card title="3 · Summary" walkthrough="summary">
               {summary?.summary ? (
                 <>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
-                    {summary.summary}
-                  </p>
+                  <div className="rounded-lg border border-border/60 bg-background/40 p-4">
+                    <MarkdownContent>{summary.summary}</MarkdownContent>
+                  </div>
                   <div className="mt-4">
                     <Row label="Pages paid">{summary.pages}</Row>
                     <Row label="Paid">
@@ -386,19 +466,32 @@ export function LiveDemo({
                     </Row>
                     <Row label="Transaction">
                       {summary.explorer ? (
-                        <a
+                        <Link
+                          to="/receipt/$txId"
+                          params={{ txId: summary.txId ?? "" }}
                           className="text-primary underline-offset-2 hover:underline"
-                          href={summary.explorer}
-                          target="_blank"
-                          rel="noreferrer"
                         >
                           {summary.txId}
-                        </a>
+                        </Link>
                       ) : (
                         (summary.txId ?? "—")
                       )}
                     </Row>
                   </div>
+                  {exchange?.paymentHeaders && retryBody && (
+                    <div className="mt-4">
+                      <CurlExportButton
+                        method="POST"
+                        url={`${typeof window !== "undefined" ? window.location.origin : ""}/api/summarize`}
+                        body={retryBody}
+                        headers={{
+                          "content-type": "application/json",
+                          ...exchange.paymentHeaders,
+                        }}
+                        label="Copy paid curl"
+                      />
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -449,7 +542,18 @@ export function LiveDemo({
             </Card>
 
             {exchange && (
-              <Card title="Protocol proof · raw payloads">
+              <>
+                <Card title="Payment header inspector">
+                  <PaymentHeaderInspector
+                    paymentRequired={headerPick?.paymentRequired}
+                    paymentSignature={
+                      headerPick?.paymentSignature ??
+                      exchange.paymentHeaders?.["payment-signature"]
+                    }
+                    paymentResponse={headerPick?.paymentResponse}
+                  />
+                </Card>
+                <Card title="Protocol proof · raw payloads">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="font-mono text-[11px]">
                     {exchange.unpaid.status} {exchange.unpaid.statusText}
@@ -477,10 +581,12 @@ export function LiveDemo({
                   </>
                 )}
               </Card>
+              </>
             )}
           </div>
+          )}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

@@ -15,6 +15,7 @@ import { priceForPages } from "@/lib/pagepay/pricing";
 import { ResilientFacilitatorClient } from "./facilitator.server";
 
 export const SUMMARIZE_ROUTE = "POST /api/summarize";
+export const CHUNK_ROUTE = "POST /api/summarize/chunk";
 /** Compiled default; the live value is getConfig().network. */
 export const X402_NETWORK = ALGORAND_TESTNET_CAIP2;
 
@@ -26,6 +27,12 @@ export interface PricedBody {
 function readPageCount(context: HTTPRequestContext): number {
   const body = context.adapter.getBody?.() as PricedBody | undefined;
   const pages = Number(body?.pageCount ?? 1);
+  return Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 1;
+}
+
+function readChunkPageCount(context: HTTPRequestContext): number {
+  const body = context.adapter.getBody?.() as { chunkPages?: number } | undefined;
+  const pages = Number(body?.chunkPages ?? 1);
   return Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 1;
 }
 
@@ -65,6 +72,41 @@ function buildRoutes(): RoutesConfig {
           error: "Payment failed",
           reason: settleResult.errorMessage ?? settleResult.errorReason ?? "settlement rejected",
           pagesQuoted: readPageCount(context),
+        },
+      }),
+    },
+    [CHUNK_ROUTE]: {
+      description: "Pay-per-chunk AI document summary (one chunk at a time)",
+      mimeType: "application/json",
+      accepts: {
+        scheme: "exact",
+        network,
+        payTo: () => {
+          const payTo = getConfig().payTo;
+          if (!payTo) throw new MissingPayToError();
+          return payTo;
+        },
+        price: (context) => priceForPages(readChunkPageCount(context), getConfig().pricePerPageUsd),
+        maxTimeoutSeconds: 120,
+      },
+      unpaidResponseBody: (context) => {
+        const pages = readChunkPageCount(context);
+        return {
+          contentType: "application/json",
+          body: {
+            error: "Payment required",
+            reason: `This chunk covers ${pages} page(s) at $0.01 per page. Attach an X-PAYMENT header signed for one of the payment requirements above.`,
+            pagesQuoted: pages,
+            priceQuoted: priceForPages(pages),
+          },
+        };
+      },
+      settlementFailedResponseBody: (context, settleResult) => ({
+        contentType: "application/json",
+        body: {
+          error: "Payment failed",
+          reason: settleResult.errorMessage ?? settleResult.errorReason ?? "settlement rejected",
+          pagesQuoted: readChunkPageCount(context),
         },
       }),
     },

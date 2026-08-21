@@ -4,7 +4,7 @@
  */
 import { extractText, getDocumentProxy } from "unpdf";
 
-import { MAX_PAGES, MAX_TEXT_CHARS, pagesForText } from "@/lib/pagepay/pricing";
+import { MAX_PAGES, MAX_TEXT_CHARS, WORDS_PER_PAGE, pagesForText } from "@/lib/pagepay/pricing";
 
 export class DocumentError extends Error {
   constructor(public readonly reason: string) {
@@ -18,6 +18,8 @@ export interface ParsedDocument {
   pages: number;
   source: "pdf" | "text";
   filename?: string;
+  /** Text for each page (index = page number, 0-based). Used by chunk summarization. */
+  pageTexts: string[];
 }
 
 export async function parsePdf(bytes: Uint8Array, filename?: string): Promise<ParsedDocument> {
@@ -31,8 +33,9 @@ export async function parsePdf(bytes: Uint8Array, filename?: string): Promise<Pa
   if (pages > MAX_PAGES) {
     throw new DocumentError(`Document has ${pages} pages; the limit is ${MAX_PAGES}.`);
   }
-  const { text } = await extractText(pdf, { mergePages: true });
-  const merged = Array.isArray(text) ? text.join("\n\n") : text;
+  const { text } = await extractText(pdf, { mergePages: false });
+  const pageTexts: string[] = Array.isArray(text) ? text.map((t) => String(t)) : [String(text)];
+  const merged = pageTexts.join("\n\n");
   if (!merged.trim()) {
     throw new DocumentError(
       "No extractable text found in the PDF (scanned images are not supported).",
@@ -42,8 +45,19 @@ export async function parsePdf(bytes: Uint8Array, filename?: string): Promise<Pa
     text: merged.slice(0, MAX_TEXT_CHARS),
     pages,
     source: "pdf",
+    pageTexts,
     ...(filename ? { filename } : {}),
   };
+}
+
+/** Split raw text into page-sized chunks by word boundaries (WORDS_PER_PAGE words each). */
+function splitTextIntoPages(text: string): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const pageTexts: string[] = [];
+  for (let i = 0; i < words.length; i += WORDS_PER_PAGE) {
+    pageTexts.push(words.slice(i, i + WORDS_PER_PAGE).join(" "));
+  }
+  return pageTexts.length > 0 ? pageTexts : [text];
 }
 
 export function parseTextInput(text: string): ParsedDocument {
@@ -57,5 +71,6 @@ export function parseTextInput(text: string): ParsedDocument {
       `Text works out to ${pages} pages (500 words each); the limit is ${MAX_PAGES}.`,
     );
   }
-  return { text, pages, source: "text" };
+  const pageTexts = splitTextIntoPages(text);
+  return { text, pages, source: "text", pageTexts };
 }

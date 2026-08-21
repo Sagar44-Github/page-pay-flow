@@ -34,6 +34,12 @@ export interface DemoPaymentRequirements {
     amount: string;
     amountFormatted: string;
     maxTimeoutSeconds: number;
+    extra?: {
+      name: string;
+      decimals: number;
+      model?: string;
+      modelLabel?: string;
+    };
   }[];
   error: string;
   reason: string;

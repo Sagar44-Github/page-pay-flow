@@ -70,6 +70,8 @@ export interface PaidRequestResult {
   paymentRequired?: PaymentRequired;
   paid?: RawExchange;
   settlement?: SettleResponse;
+  /** Headers sent on the paid retry (for curl export). */
+  paymentHeaders?: Record<string, string>;
   result?: unknown;
   error?: string;
   failureCode?: PaymentFailureCode;
@@ -262,6 +264,7 @@ export async function payAndFetch(
       unpaid,
       paymentRequired,
       paid,
+      paymentHeaders,
       ...(settlement ? { settlement } : {}),
       result: paidBody,
       ...quoteFields,

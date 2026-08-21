@@ -54,3 +54,50 @@ export function logRequest(entry: Omit<PagePayLogEntry, "timestamp">): PagePayLo
 export function recentLogs(limit = 100): PagePayLogEntry[] {
   return entries.slice(-limit).reverse();
 }
+
+export function findLogByTxId(txId: string): PagePayLogEntry | undefined {
+  const normalized = txId.trim().toUpperCase();
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i];
+    if (entry?.txId && entry.txId.toUpperCase() === normalized) return entry;
+  }
+  return undefined;
+}
+
+export interface PagePayMetrics {
+  totalTransactions: number;
+  usdcVolumeAtomic: number;
+  usdcVolumeFormatted: string;
+  avgSettlementMs: number | null;
+  successRate: number | null;
+  recent402Count: number;
+  recentSummarizedCount: number;
+}
+
+export function computeMetrics(limit = 200): PagePayMetrics {
+  const slice = entries.slice(-limit);
+  const settled = slice.filter((e) => e.outcome === "summarized" && e.txId);
+  const required = slice.filter((e) => e.outcome === "payment_required");
+  const attempts = slice.filter((e) =>
+    ["summarized", "payment_failed", "gateway_error", "paid_unfulfilled"].includes(e.outcome),
+  );
+
+  let usdcAtomic = 0;
+  for (const entry of settled) {
+    const match = entry.price.match(/\$([0-9.]+)/);
+    if (match?.[1]) usdcAtomic += Math.round(parseFloat(match[1]) * 1_000_000);
+  }
+
+  const successRate =
+    attempts.length > 0 ? Math.round((settled.length / attempts.length) * 100) : null;
+
+  return {
+    totalTransactions: settled.length,
+    usdcVolumeAtomic: usdcAtomic,
+    usdcVolumeFormatted: `$${(usdcAtomic / 1_000_000).toFixed(2)}`,
+    avgSettlementMs: null,
+    successRate,
+    recent402Count: required.length,
+    recentSummarizedCount: settled.length,
+  };
+}

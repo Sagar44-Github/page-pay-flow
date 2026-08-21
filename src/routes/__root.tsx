@@ -78,11 +78,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "PagePay — pay-per-page AI summaries over x402" },
+      { title: "PagePay — Payments for APIs that read like HTTP" },
       {
         name: "description",
         content:
-          "Pay-per-page AI document summarization settled on Algorand Testnet via the x402 protocol.",
+          "Pay-per-page AI document summarization over HTTP 402, settled on Algorand Testnet with Pera Wallet.",
       },
       { name: "author", content: "PagePay" },
       { property: "og:title", content: "PagePay — pay-per-page AI summaries over x402" },
@@ -96,11 +96,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/icon.svg" },
       {
         rel: "stylesheet",
-        href: appCss,
+        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,
@@ -109,11 +111,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const THEME_BOOTSTRAP = `(function(){try{var t=localStorage.getItem('pagepay-theme');document.documentElement.classList.add(t==='light'?'light':'dark');}catch(e){document.documentElement.classList.add('dark');}})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body>
         {children}

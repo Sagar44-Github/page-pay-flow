@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Play, Sparkles, Zap } from "lucide-react";
+import { Play, Sparkles, Zap, Bot, Gavel, RotateCcw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -16,7 +16,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Container } from "@/components/marketing/Container";
+import { MarkdownContent } from "@/components/marketing/MarkdownContent";
+import { Reveal } from "@/components/marketing/Reveal";
+import { CurlExportButton, buildCurl } from "@/components/hackathon/CurlExportButton";
+import {
+  PaymentHeaderInspector,
+} from "@/components/hackathon/PaymentHeaderInspector";
+import { useX402GuidedTour, resetX402GuidedTour } from "@/components/x402demo/X402GuidedTour";
 import { cn } from "@/lib/utils";
+import { demoPriceForModel, DEMO_MODEL_PRICING } from "@/lib/x402demo/pricing";
 import {
   DEMO_MODES,
   DEMO_MODE_DESCRIPTIONS,
@@ -91,7 +107,14 @@ export default function X402DemoApp() {
   const [exchanges, setExchanges] = useState<HttpExchange[]>([]);
   const [result, setResult] = useState<UnlockedResult | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [running, setRunning] = useState<null | "live" | "simulated">(null);
+  const [running, setRunning] = useState<null | "live" | "simulated" | "agent">(null);
+  const [judgeMode, setJudgeMode] = useState(true);
+  const [lastCurl, setLastCurl] = useState<string | null>(null);
+  const [headerSnapshot, setHeaderSnapshot] = useState<{
+    paymentRequired?: string;
+    paymentSignature?: string;
+    paymentResponse?: string;
+  }>({});
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -101,6 +124,9 @@ export default function X402DemoApp() {
       model: "llama-3.1-8b-instant",
     },
   });
+
+  const selectedModel = form.watch("model");
+  const modelPricing = demoPriceForModel(selectedModel);
 
   const log = useCallback((level: LogLevel, source: string, message: string, detail?: string) => {
     const id = uid("log");
@@ -116,6 +142,12 @@ export default function X402DemoApp() {
       },
     ]);
   }, []);
+
+  useX402GuidedTour({
+    enabled: running === null && !result,
+    onSelectHappy: () => setMode("happy"),
+    onRunTestMode: () => form.handleSubmit((values) => void runSimulation(values))(),
+  });
 
   const setStep = useCallback((key: StepKey, state: StepState) => {
     setSteps((previous) => ({ ...previous, [key]: state }));
@@ -147,7 +179,8 @@ export default function X402DemoApp() {
     [log],
   );
 
-  function buildPayload(): DemoPaymentPayload {
+  function buildPayload(model: string): DemoPaymentPayload {
+    const pricing = demoPriceForModel(model);
     const nonce = randomNonce();
     return {
       x402Version: 1,
@@ -157,12 +190,22 @@ export default function X402DemoApp() {
         from: MOCK_PAYER,
         to: MOCK_PAY_TO,
         asset: "10458941",
-        amount: "10000",
+        amount: pricing.amount,
         nonce,
         validUntil: Math.floor(Date.now() / 1000) + 60,
         signature: mockSignature(nonce),
       },
     };
+  }
+
+  async function runAsAgent(values: FormValues) {
+    setMode("happy");
+    log("info", "agent", "Agent autopay started — zero UI clicks");
+    if (judgeMode) {
+      await runSimulation(values);
+      return;
+    }
+    await runLive(values);
   }
 
   /** Pure client-side simulation — no network, no payment, all states shown. */
@@ -186,6 +229,7 @@ export default function X402DemoApp() {
 
     setStep("challenge", "active");
     await sleep(500);
+    const pricing = demoPriceForModel(values.model);
     const requirements = {
       x402Version: 1,
       accepts: [
@@ -195,9 +239,10 @@ export default function X402DemoApp() {
           resource: "/api/x402-demo",
           payTo: MOCK_PAY_TO,
           asset: "10458941",
-          amount: "10000",
-          amountFormatted: "$0.01",
+          amount: pricing.amount,
+          amountFormatted: pricing.amountFormatted,
           maxTimeoutSeconds: 60,
+          extra: { name: "USDC", decimals: 6, model: values.model, modelLabel: pricing.label },
         },
       ],
       error: "Payment required",
@@ -211,16 +256,19 @@ export default function X402DemoApp() {
         "content-type": "application/json",
         "x-payment-required": "true",
         "x-x402-version": "1",
-        "www-authenticate": `x402 network="${NETWORK}", scheme="exact", amount="10000", asset="10458941"`,
+        "www-authenticate": `x402 network="${NETWORK}", scheme="exact", amount="${pricing.amount}", asset="10458941"`,
       },
       body: JSON.stringify(requirements, null, 2),
     });
-    log("warn", "x402", "402 Payment Required received", "$0.01 · exact · algorand:testnet-v1.0");
+    setHeaderSnapshot({
+      paymentRequired: btoa(JSON.stringify(requirements)),
+    });
+    log("warn", "x402", "402 Payment Required received", `${pricing.amountFormatted} · ${values.model}`);
     setStep("challenge", "done");
 
     setStep("construct", "active");
     await sleep(450);
-    const payload = buildPayload();
+    const payload = buildPayload(values.model);
     const header = encodePaymentHeader(payload);
     pushExchange({
       title: "Retry request with X-Payment header",
@@ -228,8 +276,15 @@ export default function X402DemoApp() {
       method: "POST",
       url: "/api/x402-demo",
       headers: { "content-type": "application/json", "x-payment": header },
-      body: JSON.stringify(payload, null, 2),
+      body: JSON.stringify({ prompt: values.prompt, mode, model: values.model }, null, 2),
     });
+    setHeaderSnapshot((prev) => ({ ...prev, paymentSignature: header }));
+    setLastCurl(
+      buildCurl("POST", `${window.location.origin}/api/x402-demo`, JSON.stringify({ prompt: values.prompt, mode, model: values.model }), {
+        "content-type": "application/json",
+        "x-payment": header,
+      }),
+    );
     log("info", "x402", "X-Payment header constructed", `${header.slice(0, 40)}…`);
     setStep("construct", "done");
 
@@ -328,6 +383,10 @@ export default function X402DemoApp() {
       },
       body: JSON.stringify({ unlocked: true, content: "…", model: values.model }, null, 2),
     });
+    setHeaderSnapshot((prev) => ({
+      ...prev,
+      paymentResponse: JSON.stringify({ success: true, network: NETWORK, transaction }),
+    }));
     setResult({
       content: simulatedContent,
       model: values.model,
@@ -390,12 +449,22 @@ export default function X402DemoApp() {
         return;
       }
       setStep("challenge", "done");
-      log("warn", "x402", "402 Payment Required received", "$0.01 · exact · algorand:testnet-v1.0");
+      log("warn", "x402", "402 Payment Required received", `${modelPricing.amountFormatted} · ${values.model}`);
 
       setStep("construct", "active");
-      const payload = buildPayload();
+      const payload = buildPayload(values.model);
       const header =
         mode === "invalid" ? "not-a-valid-base64-payment-token" : encodePaymentHeader(payload);
+      setHeaderSnapshot({
+        paymentRequired: firstHeaders["x-payment-required"],
+        paymentSignature: header,
+      });
+      setLastCurl(
+        buildCurl("POST", `${window.location.origin}/api/x402-demo`, body, {
+          "content-type": "application/json",
+          "x-payment": header,
+        }),
+      );
       pushExchange({
         title: "Retry request with X-Payment header",
         direction: "request",
@@ -452,6 +521,10 @@ export default function X402DemoApp() {
       setStep("authorize", "done");
       setStep("settle", "done");
       setStep("unlock", "active");
+      setHeaderSnapshot((prev) => ({
+        ...prev,
+        paymentResponse: secondHeaders["x-payment-response"],
+      }));
       setResult({
         content: secondJson.content ?? "",
         model: secondJson.model ?? values.model,
@@ -484,189 +557,317 @@ export default function X402DemoApp() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              x402 Protocol Demo
-              <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                groq · llama 3.1 / 3.3
-              </span>
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Watch an HTTP 402 paywall negotiate a machine payment end to end: challenge, signed
-              X-Payment header, settlement, and the unlocked Groq-generated resource.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="font-mono text-[11px]">
-              scheme exact
-            </Badge>
-            <Badge variant="outline" className="font-mono text-[11px]">
-              {NETWORK}
-            </Badge>
-            <Badge variant="outline" className="font-mono text-[11px]">
-              $0.01 / request
-            </Badge>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        <section className="space-y-6">
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              1 · Simulation mode
-            </h2>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {DEMO_MODES.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setMode(value)}
-                  className={cn(
-                    "rounded-md border px-3 py-2 text-xs font-medium transition-colors",
-                    mode === value
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {DEMO_MODE_LABELS[value]}
-                </button>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">{DEMO_MODE_DESCRIPTIONS[mode]}</p>
-          </div>
-
-          <form
-            className="rounded-xl border border-border bg-card p-5"
-            onSubmit={form.handleSubmit(runLive)}
-          >
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              2 · Gated request
-            </h2>
-            <div className="mt-3 space-y-3">
-              <div>
-                <Label htmlFor="prompt" className="text-xs text-muted-foreground">
-                  What should the paid resource generate?
-                </Label>
-                <Textarea
-                  id="prompt"
-                  {...form.register("prompt")}
-                  className="mt-1 min-h-28 font-mono text-xs"
-                />
-                {form.formState.errors.prompt && (
-                  <p className="mt-1 text-xs text-destructive">
-                    {form.formState.errors.prompt.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="model" className="text-xs text-muted-foreground">
-                  Groq model
-                </Label>
-                <select
-                  id="model"
-                  {...form.register("model")}
-                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-xs text-foreground"
-                >
-                  <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
-                  <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                </select>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={running !== null} className="gap-2">
-                  <Zap className="h-4 w-4" />
-                  {running === "live" ? "Running exchange…" : "Run live x402 flow"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={running !== null}
-                  className="gap-2"
-                  onClick={form.handleSubmit(runSimulation)}
-                >
-                  <Play className="h-4 w-4" />
-                  {running === "simulated" ? "Simulating…" : "Test Mode (no payment)"}
-                </Button>
-              </div>
-              <p className="font-mono text-[11px] text-muted-foreground">
-                Test Mode mocks every step client-side. The live flow calls the real /api/x402-demo
-                route and Groq.
-              </p>
-            </div>
-          </form>
-
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              3 · Payment status
-            </h2>
-            <div className="mt-4">
-              <PaymentTimeline steps={timeline} />
-            </div>
-            {failure && (
-              <p className="mt-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {failure}
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="space-y-6">
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              HTTP exchange · raw headers &amp; payloads
-            </h2>
-            {exchanges.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Run a flow to capture each request and response verbatim.
-              </p>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {exchanges.map((exchange, index) => (
-                  <HttpExchangeView
-                    key={exchange.id}
-                    exchange={exchange}
-                    defaultOpen={index === 1}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="h-80">
-            <LogConsole entries={logs} onClear={() => setLogs([])} />
-          </div>
-
-          {result && (
-            <div className="rounded-xl border border-primary/40 bg-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-primary">
-                  <Sparkles className="h-4 w-4" /> Unlocked resource
-                </h2>
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {result.simulated ? "simulated" : "live"} · {result.model} · {result.latencyMs}ms
-                  {result.usage?.total_tokens ? ` · ${result.usage.total_tokens} tokens` : ""}
+    <div className="relative border-b border-border">
+      <Container className="relative py-10 md:py-14">
+        <Reveal>
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div>
+              <h1 className="text-display-hero text-foreground">
+                x402 Protocol Demo
+                <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                  groq · llama 3.1 / 3.3
                 </span>
-              </div>
-              <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
-                <dt>settled</dt>
-                <dd className="text-card-foreground">{String(result.settlement.success)}</dd>
-                <dt>network</dt>
-                <dd className="text-card-foreground">{result.settlement.network}</dd>
-                <dt>txid</dt>
-                <dd className="break-all text-card-foreground">{result.settlement.transaction}</dd>
-                <dt>payer</dt>
-                <dd className="break-all text-card-foreground">{result.settlement.payer}</dd>
-              </dl>
-              <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
-                {result.content}
-              </div>
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                Watch an HTTP 402 paywall negotiate a machine payment end to end: challenge, signed
+                PAYMENT-SIGNATURE header, settlement, and the unlocked Groq-generated resource.
+              </p>
             </div>
-          )}
-        </section>
-      </main>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="font-mono text-[11px]">
+                scheme exact
+              </Badge>
+              <Badge variant="outline" className="font-mono text-[11px]">
+                {NETWORK}
+              </Badge>
+              <Badge variant="outline" className="font-mono text-[11px]">
+                {modelPricing.amountFormatted} / request
+              </Badge>
+            </div>
+          </div>
+        </Reveal>
+
+        <main className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          <section className="space-y-6">
+            <Reveal delay={60}>
+              <Card className="border-border/80 bg-card/95 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    1 · Simulation mode
+                  </CardTitle>
+                  <CardDescription>{DEMO_MODE_DESCRIPTIONS[mode]}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2">
+                    {DEMO_MODES.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setMode(value)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2.5 text-xs font-medium transition-all duration-300",
+                          mode === value
+                            ? "border-accent-green bg-accent-green/15 text-accent-green shadow-sm shadow-accent-green/10"
+                            : "border-border bg-muted/40 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground",
+                        )}
+                      >
+                        {DEMO_MODE_LABELS[value]}
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <Card className="border-border/80 bg-card/95 shadow-sm">
+                <form onSubmit={form.handleSubmit(runLive)}>
+                  <CardHeader>
+                    <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      2 · Gated request
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <Label htmlFor="prompt" className="text-xs text-muted-foreground">
+                        What should the paid resource generate?
+                      </Label>
+                      <Textarea
+                        id="prompt"
+                        {...form.register("prompt")}
+                        className="mt-1 min-h-28 font-mono text-xs"
+                      />
+                      {form.formState.errors.prompt && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {form.formState.errors.prompt.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="model" className="text-xs text-muted-foreground">
+                        Groq model
+                      </Label>
+                      <select
+                        id="model"
+                        {...form.register("model")}
+                        className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-xs text-foreground"
+                      >
+                        {Object.entries(DEMO_MODEL_PRICING).map(([id, p]) => (
+                          <option key={id} value={id}>
+                            {p.label} — {p.amountFormatted}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                        Quote includes model in <code className="text-foreground">extra.model</code>{" "}
+                        ({modelPricing.amount} atomic USDC)
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Gavel className="size-4 text-muted-foreground" />
+                        <span className="font-sans text-xs text-foreground">Judge wallet (no Pera)</span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={judgeMode ? "default" : "secondary"}
+                        onClick={() => setJudgeMode((v) => !v)}
+                      >
+                        {judgeMode ? "On" : "Off"}
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button type="submit" disabled={running !== null} className="gap-2">
+                        <Zap className="h-4 w-4" />
+                        {running === "live" ? "Running exchange…" : "Run live x402 flow"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={running !== null}
+                        className="gap-2"
+                        onClick={form.handleSubmit(runSimulation)}
+                      >
+                        <Play className="h-4 w-4" />
+                        {running === "simulated" ? "Simulating…" : "Test Mode (no payment)"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={running !== null}
+                        className="gap-2"
+                        onClick={form.handleSubmit(async (v) => {
+                          setRunning("agent");
+                          try {
+                            await runAsAgent(v);
+                          } finally {
+                            setRunning(null);
+                          }
+                        })}
+                      >
+                        <Bot className="h-4 w-4" />
+                        {running === "agent" ? "Agent running…" : "Run as agent"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 font-mono text-[11px]"
+                        onClick={() => {
+                          resetX402GuidedTour();
+                          toast.message("Guided tour will replay on next visit");
+                        }}
+                      >
+                        <RotateCcw className="size-3" />
+                        Reset tour
+                      </Button>
+                    </div>
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Test Mode mocks every step client-side. The live flow calls the real
+                      /api/x402-demo route and Groq.
+                    </p>
+                  </CardContent>
+                </form>
+              </Card>
+            </Reveal>
+
+            <Reveal delay={180}>
+              <Card className="border-border/80 bg-card/95 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    3 · Payment status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PaymentTimeline steps={timeline} />
+                  {failure && (
+                    <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      {failure}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </Reveal>
+          </section>
+
+          <section className="space-y-6">
+            <Reveal delay={100}>
+              <Card id="x402-http-exchange" className="border-border/80 bg-card/95 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    HTTP exchange · raw headers &amp; payloads
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {exchanges.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Run a flow to capture each request and response verbatim.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {exchanges.map((exchange, index) => (
+                        <HttpExchangeView
+                          key={exchange.id}
+                          exchange={exchange}
+                          defaultOpen={index === 1}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </Reveal>
+
+            <Reveal delay={140}>
+              <Card className="border-border/80 bg-card/95 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Payment header inspector
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PaymentHeaderInspector
+                    paymentRequired={headerSnapshot.paymentRequired}
+                    paymentSignature={headerSnapshot.paymentSignature}
+                    paymentResponse={headerSnapshot.paymentResponse}
+                  />
+                  {lastCurl ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <CurlExportButton
+                        method="POST"
+                        url={`${typeof window !== "undefined" ? window.location.origin : ""}/api/x402-demo`}
+                        body={form.getValues("prompt") ? JSON.stringify({ prompt: form.getValues("prompt"), mode, model: form.getValues("model") }) : undefined}
+                        headers={{
+                          "content-type": "application/json",
+                          ...(headerSnapshot.paymentSignature
+                            ? { "x-payment": headerSnapshot.paymentSignature }
+                            : {}),
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </Reveal>
+
+            <Reveal delay={160}>
+              <Card className="border-border/80 bg-card/95 shadow-sm">
+                <CardContent className="p-0">
+                  <div className="h-80">
+                    <LogConsole entries={logs} onClear={() => setLogs([])} />
+                  </div>
+                </CardContent>
+              </Card>
+            </Reveal>
+
+            {result && (
+              <Reveal delay={80}>
+                <Card className="border-accent-green/40 bg-card/95 shadow-md shadow-accent-green/5">
+                  <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CardTitle className="flex items-center gap-2 font-sans text-xs font-semibold uppercase tracking-wider text-accent-green">
+                        <Sparkles className="h-4 w-4" /> Unlocked resource
+                      </CardTitle>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {result.simulated ? "simulated" : "live"} · {result.model} ·{" "}
+                        {result.latencyMs}ms
+                        {result.usage?.total_tokens ? ` · ${result.usage.total_tokens} tokens` : ""}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
+                      <dt>settled</dt>
+                      <dd className="text-card-foreground">{String(result.settlement.success)}</dd>
+                      <dt>network</dt>
+                      <dd className="text-card-foreground">{result.settlement.network}</dd>
+                      <dt>txid</dt>
+                      <dd className="break-all text-card-foreground">
+                        {result.settlement.transaction}
+                      </dd>
+                      <dt>payer</dt>
+                      <dd className="break-all text-card-foreground">{result.settlement.payer}</dd>
+                    </dl>
+                    <div className="mt-4 rounded-lg border border-border/60 bg-background/40 p-4">
+                      <MarkdownContent>{result.content}</MarkdownContent>
+                    </div>
+                    {result.settlement.transaction && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button variant="secondary" size="sm" asChild>
+                          <a href={`/receipt/${encodeURIComponent(result.settlement.transaction)}`}>
+                            View receipt
+                          </a>
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </Reveal>
+            )}
+          </section>
+        </main>
+      </Container>
     </div>
   );
 }

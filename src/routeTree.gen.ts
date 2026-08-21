@@ -11,12 +11,25 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DemoRouteImport } from './routes/demo'
+import { Route as DevelopersRouteImport } from './routes/developers'
+import { Route as IntegrationsRouteImport } from './routes/integrations'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as ProductRouteImport } from './routes/product'
+import { Route as StatsRouteImport } from './routes/stats'
 import { Route as X402DemoRouteImport } from './routes/x402-demo'
 import { Route as ApiGroqRouteImport } from './routes/api/groq'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
+import { Route as ApiMetricsRouteImport } from './routes/api/metrics'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
+import { Route as ApiReceiptRouteImport } from './routes/api/receipt'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
 import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as DocsAlgorandRouteImport } from './routes/docs/algorand'
+import { Route as DocsX402RouteImport } from './routes/docs/x402'
+import { Route as ReceiptTxIdRouteImport } from './routes/receipt/$txId'
+import { Route as ApiSummarizeChunkRouteImport } from './routes/api/summarize/chunk'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -26,6 +39,36 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevelopersRoute = DevelopersRouteImport.update({
+  id: '/developers',
+  path: '/developers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IntegrationsRoute = IntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductRoute = ProductRouteImport.update({
+  id: '/product',
+  path: '/product',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatsRoute = StatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const X402DemoRoute = X402DemoRouteImport.update({
@@ -43,9 +86,19 @@ const ApiLogsRoute = ApiLogsRouteImport.update({
   path: '/api/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetricsRoute = ApiMetricsRouteImport.update({
+  id: '/api/metrics',
+  path: '/api/metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPriceRoute = ApiPriceRouteImport.update({
   id: '/api/price',
   path: '/api/price',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReceiptRoute = ApiReceiptRouteImport.update({
+  id: '/api/receipt',
+  path: '/api/receipt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSummarizeRoute = ApiSummarizeRouteImport.update({
@@ -58,80 +111,195 @@ const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
   path: '/api/x402-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsAlgorandRoute = DocsAlgorandRouteImport.update({
+  id: '/docs/algorand',
+  path: '/docs/algorand',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsX402Route = DocsX402RouteImport.update({
+  id: '/docs/x402',
+  path: '/docs/x402',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceiptTxIdRoute = ReceiptTxIdRouteImport.update({
+  id: '/receipt/$txId',
+  path: '/receipt/$txId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSummarizeChunkRoute = ApiSummarizeChunkRouteImport.update({
+  id: '/chunk',
+  path: '/chunk',
+  getParentRoute: () => ApiSummarizeRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demo': typeof DemoRoute
+  '/developers': typeof DevelopersRoute
+  '/integrations': typeof IntegrationsRoute
+  '/pricing': typeof PricingRoute
+  '/product': typeof ProductRoute
+  '/stats': typeof StatsRoute
   '/x402-demo': typeof X402DemoRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
+  '/api/metrics': typeof ApiMetricsRoute
   '/api/price': typeof ApiPriceRoute
-  '/api/summarize': typeof ApiSummarizeRoute
+  '/api/receipt': typeof ApiReceiptRoute
+  '/api/summarize': typeof ApiSummarizeRouteWithChildren
   '/api/x402-demo': typeof ApiX402DemoRoute
+  '/docs/algorand': typeof DocsAlgorandRoute
+  '/docs/x402': typeof DocsX402Route
+  '/receipt/$txId': typeof ReceiptTxIdRoute
+  '/docs/': typeof DocsIndexRoute
+  '/api/summarize/chunk': typeof ApiSummarizeChunkRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demo': typeof DemoRoute
+  '/developers': typeof DevelopersRoute
+  '/integrations': typeof IntegrationsRoute
+  '/pricing': typeof PricingRoute
+  '/product': typeof ProductRoute
+  '/stats': typeof StatsRoute
   '/x402-demo': typeof X402DemoRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
+  '/api/metrics': typeof ApiMetricsRoute
   '/api/price': typeof ApiPriceRoute
-  '/api/summarize': typeof ApiSummarizeRoute
+  '/api/receipt': typeof ApiReceiptRoute
+  '/api/summarize': typeof ApiSummarizeRouteWithChildren
   '/api/x402-demo': typeof ApiX402DemoRoute
+  '/docs/algorand': typeof DocsAlgorandRoute
+  '/docs/x402': typeof DocsX402Route
+  '/receipt/$txId': typeof ReceiptTxIdRoute
+  '/docs': typeof DocsIndexRoute
+  '/api/summarize/chunk': typeof ApiSummarizeChunkRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/demo': typeof DemoRoute
+  '/developers': typeof DevelopersRoute
+  '/integrations': typeof IntegrationsRoute
+  '/pricing': typeof PricingRoute
+  '/product': typeof ProductRoute
+  '/stats': typeof StatsRoute
   '/x402-demo': typeof X402DemoRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
+  '/api/metrics': typeof ApiMetricsRoute
   '/api/price': typeof ApiPriceRoute
-  '/api/summarize': typeof ApiSummarizeRoute
+  '/api/receipt': typeof ApiReceiptRoute
+  '/api/summarize': typeof ApiSummarizeRouteWithChildren
   '/api/x402-demo': typeof ApiX402DemoRoute
+  '/docs/algorand': typeof DocsAlgorandRoute
+  '/docs/x402': typeof DocsX402Route
+  '/receipt/$txId': typeof ReceiptTxIdRoute
+  '/docs/': typeof DocsIndexRoute
+  '/api/summarize/chunk': typeof ApiSummarizeChunkRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
+    | '/demo'
+    | '/developers'
+    | '/integrations'
+    | '/pricing'
+    | '/product'
+    | '/stats'
     | '/x402-demo'
     | '/api/groq'
     | '/api/logs'
+    | '/api/metrics'
     | '/api/price'
+    | '/api/receipt'
     | '/api/summarize'
     | '/api/x402-demo'
+    | '/docs/algorand'
+    | '/docs/x402'
+    | '/receipt/$txId'
+    | '/docs/'
+    | '/api/summarize/chunk'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
+    | '/demo'
+    | '/developers'
+    | '/integrations'
+    | '/pricing'
+    | '/product'
+    | '/stats'
     | '/x402-demo'
     | '/api/groq'
     | '/api/logs'
+    | '/api/metrics'
     | '/api/price'
+    | '/api/receipt'
     | '/api/summarize'
     | '/api/x402-demo'
+    | '/docs/algorand'
+    | '/docs/x402'
+    | '/receipt/$txId'
+    | '/docs'
+    | '/api/summarize/chunk'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/demo'
+    | '/developers'
+    | '/integrations'
+    | '/pricing'
+    | '/product'
+    | '/stats'
     | '/x402-demo'
     | '/api/groq'
     | '/api/logs'
+    | '/api/metrics'
     | '/api/price'
+    | '/api/receipt'
     | '/api/summarize'
     | '/api/x402-demo'
+    | '/docs/algorand'
+    | '/docs/x402'
+    | '/receipt/$txId'
+    | '/docs/'
+    | '/api/summarize/chunk'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  DemoRoute: typeof DemoRoute
+  DevelopersRoute: typeof DevelopersRoute
+  IntegrationsRoute: typeof IntegrationsRoute
+  PricingRoute: typeof PricingRoute
+  ProductRoute: typeof ProductRoute
+  StatsRoute: typeof StatsRoute
   X402DemoRoute: typeof X402DemoRoute
   ApiGroqRoute: typeof ApiGroqRoute
   ApiLogsRoute: typeof ApiLogsRoute
+  ApiMetricsRoute: typeof ApiMetricsRoute
   ApiPriceRoute: typeof ApiPriceRoute
-  ApiSummarizeRoute: typeof ApiSummarizeRoute
+  ApiReceiptRoute: typeof ApiReceiptRoute
+  ApiSummarizeRoute: typeof ApiSummarizeRouteWithChildren
   ApiX402DemoRoute: typeof ApiX402DemoRoute
+  DocsAlgorandRoute: typeof DocsAlgorandRoute
+  DocsX402Route: typeof DocsX402Route
+  ReceiptTxIdRoute: typeof ReceiptTxIdRoute
+  DocsIndexRoute: typeof DocsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -148,6 +316,48 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/developers': {
+      id: '/developers'
+      path: '/developers'
+      fullPath: '/developers'
+      preLoaderRoute: typeof DevelopersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integrations': {
+      id: '/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product': {
+      id: '/product'
+      path: '/product'
+      fullPath: '/product'
+      preLoaderRoute: typeof ProductRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stats': {
+      id: '/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof StatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/x402-demo': {
@@ -171,11 +381,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/metrics': {
+      id: '/api/metrics'
+      path: '/api/metrics'
+      fullPath: '/api/metrics'
+      preLoaderRoute: typeof ApiMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/price': {
       id: '/api/price'
       path: '/api/price'
       fullPath: '/api/price'
       preLoaderRoute: typeof ApiPriceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/receipt': {
+      id: '/api/receipt'
+      path: '/api/receipt'
+      fullPath: '/api/receipt'
+      preLoaderRoute: typeof ApiReceiptRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/summarize': {
@@ -192,18 +416,77 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiX402DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/algorand': {
+      id: '/docs/algorand'
+      path: '/docs/algorand'
+      fullPath: '/docs/algorand'
+      preLoaderRoute: typeof DocsAlgorandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/x402': {
+      id: '/docs/x402'
+      path: '/docs/x402'
+      fullPath: '/docs/x402'
+      preLoaderRoute: typeof DocsX402RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receipt/$txId': {
+      id: '/receipt/$txId'
+      path: '/receipt/$txId'
+      fullPath: '/receipt/$txId'
+      preLoaderRoute: typeof ReceiptTxIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/summarize/chunk': {
+      id: '/api/summarize/chunk'
+      path: '/chunk'
+      fullPath: '/api/summarize/chunk'
+      preLoaderRoute: typeof ApiSummarizeChunkRouteImport
+      parentRoute: typeof ApiSummarizeRoute
+    }
   }
 }
+
+interface ApiSummarizeRouteChildren {
+  ApiSummarizeChunkRoute: typeof ApiSummarizeChunkRoute
+}
+
+const ApiSummarizeRouteChildren: ApiSummarizeRouteChildren = {
+  ApiSummarizeChunkRoute: ApiSummarizeChunkRoute,
+}
+
+const ApiSummarizeRouteWithChildren = ApiSummarizeRoute._addFileChildren(
+  ApiSummarizeRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  DemoRoute: DemoRoute,
+  DevelopersRoute: DevelopersRoute,
+  IntegrationsRoute: IntegrationsRoute,
+  PricingRoute: PricingRoute,
+  ProductRoute: ProductRoute,
+  StatsRoute: StatsRoute,
   X402DemoRoute: X402DemoRoute,
   ApiGroqRoute: ApiGroqRoute,
   ApiLogsRoute: ApiLogsRoute,
+  ApiMetricsRoute: ApiMetricsRoute,
   ApiPriceRoute: ApiPriceRoute,
-  ApiSummarizeRoute: ApiSummarizeRoute,
+  ApiReceiptRoute: ApiReceiptRoute,
+  ApiSummarizeRoute: ApiSummarizeRouteWithChildren,
   ApiX402DemoRoute: ApiX402DemoRoute,
+  DocsAlgorandRoute: DocsAlgorandRoute,
+  DocsX402Route: DocsX402Route,
+  ReceiptTxIdRoute: ReceiptTxIdRoute,
+  DocsIndexRoute: DocsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

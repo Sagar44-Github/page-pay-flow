@@ -14,10 +14,10 @@ export interface LogEntry {
 }
 
 const LEVEL_STYLES: Record<LogLevel, string> = {
-  info: "text-sky-300",
-  warn: "text-amber-300",
-  error: "text-red-400",
-  success: "text-primary",
+  info: "text-accent-blue",
+  warn: "text-accent-amber",
+  error: "text-destructive",
+  success: "text-accent-green",
 };
 
 const LEVEL_LABELS: Record<LogLevel, string> = {
@@ -36,7 +36,7 @@ export function LogConsole({ entries, onClear }: { entries: LogEntry[]; onClear:
   }, [entries.length]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-[oklch(0.16_0.01_260)]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-secondary">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
           live log console · {entries.length} events
@@ -49,7 +49,7 @@ export function LogConsole({ entries, onClear }: { entries: LogEntry[]; onClear:
           clear
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-3 font-mono text-[11px] leading-relaxed">
+      <div className="min-h-0 flex-1 overflow-auto bg-card px-4 py-3 font-mono text-[11px] leading-relaxed">
         {entries.length === 0 && (
           <p className="text-muted-foreground">
             waiting for events — run a simulation to stream protocol logs…
@@ -57,14 +57,14 @@ export function LogConsole({ entries, onClear }: { entries: LogEntry[]; onClear:
         )}
         {entries.map((entry) => (
           <div key={entry.id} className="flex gap-2 py-[2px]">
-            <span className="shrink-0 text-muted-foreground/70">
+            <span className="shrink-0 text-muted-foreground">
               {entry.timestamp.slice(11, 23)}
             </span>
             <span className={cn("shrink-0 whitespace-pre", LEVEL_STYLES[entry.level])}>
               {LEVEL_LABELS[entry.level]}
             </span>
             <span className="shrink-0 text-muted-foreground">[{entry.source}]</span>
-            <span className="min-w-0 break-words text-foreground/90">
+            <span className="min-w-0 break-words text-foreground">
               {entry.message}
               {entry.detail && <span className="text-muted-foreground"> — {entry.detail}</span>}
             </span>

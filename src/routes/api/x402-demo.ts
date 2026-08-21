@@ -15,11 +15,11 @@ import {
   type DemoPaymentRequirements,
   type DemoServerLogEntry,
 } from "@/lib/x402demo/protocol";
+import { demoPriceForModel, isDemoGroqModel } from "@/lib/x402demo/pricing";
 
 const PAY_TO = "PAGEPAYDEMOMERCHANTADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
 const NETWORK = "algorand:testnet-v1.0";
 const ASSET = "10458941"; // Testnet USDC ASA
-const AMOUNT_ATOMIC = "10000"; // 0.01 USDC (6 decimals)
 
 function createLogger() {
   const entries: DemoServerLogEntry[] = [];
@@ -42,7 +42,12 @@ function createLogger() {
   };
 }
 
-function paymentRequirements(resource: string, mode: DemoMode): DemoPaymentRequirements {
+function paymentRequirements(
+  resource: string,
+  mode: DemoMode,
+  model: string,
+): DemoPaymentRequirements {
+  const pricing = demoPriceForModel(model);
   return {
     x402Version: 1,
     accepts: [
@@ -50,17 +55,23 @@ function paymentRequirements(resource: string, mode: DemoMode): DemoPaymentRequi
         scheme: "exact",
         network: NETWORK,
         resource,
-        description: "Groq-generated gated briefing (x402 demo)",
+        description: `Groq ${pricing.label} (x402 demo)`,
         mimeType: "application/json",
         payTo: PAY_TO,
         asset: ASSET,
-        amount: AMOUNT_ATOMIC,
-        amountFormatted: "$0.01",
+        amount: pricing.amount,
+        amountFormatted: pricing.amountFormatted,
         maxTimeoutSeconds: 60,
+        extra: {
+          name: "USDC",
+          decimals: 6,
+          model,
+          modelLabel: pricing.label,
+        },
       },
     ],
     error: "Payment required",
-    reason: `Attach an X-Payment header signed for one of the accepted payment requirements. Simulation mode: ${mode}.`,
+    reason: `Attach an X-Payment header signed for one of the accepted payment requirements. Simulation mode: ${mode}. Model: ${pricing.label} at ${pricing.amountFormatted}.`,
   };
 }
 
@@ -100,21 +111,23 @@ export const Route = createFileRoute("/api/x402-demo")({
           ? (body.mode as DemoMode)
           : "happy";
         const prompt = (body.prompt ?? "").trim();
+        const model = isDemoGroqModel(body.model ?? "") ? body.model! : GROQ_DEFAULT_MODEL;
+        const pricing = demoPriceForModel(model);
         logger.log(
           "info",
           `POST /api/x402-demo received`,
-          `mode=${mode} promptChars=${prompt.length}`,
+          `mode=${mode} model=${model} price=${pricing.amountFormatted} promptChars=${prompt.length}`,
         );
 
         const paymentHeader = request.headers.get("x-payment");
 
         if (!paymentHeader) {
           logger.log("warn", "No X-Payment header present → responding 402 Payment Required");
-          const requirements = paymentRequirements(resource, mode);
-          return json({ ...requirements, mode, serverLog: logger.entries }, 402, {
+          const requirements = paymentRequirements(resource, mode, model);
+          return json({ ...requirements, mode, model, serverLog: logger.entries }, 402, {
             "x-payment-required": "true",
             "x-x402-version": "1",
-            "www-authenticate": `x402 network="${NETWORK}", scheme="exact", amount="${AMOUNT_ATOMIC}", asset="${ASSET}"`,
+            "www-authenticate": `x402 network="${NETWORK}", scheme="exact", amount="${pricing.amount}", asset="${ASSET}"`,
           });
         }
 
@@ -143,7 +156,7 @@ export const Route = createFileRoute("/api/x402-demo")({
         const valid =
           payload?.scheme === "exact" &&
           payload?.network === NETWORK &&
-          payload?.payload?.amount === AMOUNT_ATOMIC &&
+          payload?.payload?.amount === pricing.amount &&
           payload?.payload?.to === PAY_TO &&
           typeof payload?.payload?.signature === "string" &&
           payload.payload.signature.startsWith("mock-ed25519:");
@@ -203,7 +216,7 @@ export const Route = createFileRoute("/api/x402-demo")({
             `model=${body.model ?? GROQ_DEFAULT_MODEL}`,
           );
           const completion = await groqChat({
-            ...(body.model ? { model: body.model } : {}),
+            model,
             messages: [
               {
                 role: "system",
