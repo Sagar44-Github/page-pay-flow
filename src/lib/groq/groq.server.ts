@@ -3,8 +3,8 @@
  */
 
 export const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
-export const GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile";
-export const GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-4-scout-17b-16e-instruct"] as const;
+export const GROQ_DEFAULT_MODEL = "openai/gpt-oss-20b";
+export const GROQ_MODELS = ["openai/gpt-oss-20b", "qwen/qwen3.6-27b"] as const;
 
 export type GroqModel = (typeof GROQ_MODELS)[number];
 

@@ -51,7 +51,7 @@ const formSchema = z.object({
     .trim()
     .min(8, "Give the gated resource at least 8 characters of context.")
     .max(2000, "Keep the prompt under 2000 characters."),
-  model: z.enum(["llama-3.3-70b-versatile", "llama-4-scout-17b-16e-instruct"]),
+  model: z.enum(["openai/gpt-oss-20b", "qwen/qwen3.6-27b"]),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -121,7 +121,7 @@ export default function X402DemoApp() {
     defaultValues: {
       prompt:
         "Brief a technical audience on why HTTP 402 machine payments unlock new agent business models.",
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-20b",
     },
   });
 
@@ -565,7 +565,7 @@ export default function X402DemoApp() {
               <h1 className="text-display-hero text-foreground">
                 x402 Protocol Demo
                 <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                  groq · llama 3.1 / 3.3
+                  groq · gpt-oss / qwen
                 </span>
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">

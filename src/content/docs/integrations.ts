@@ -64,8 +64,8 @@ The hosted facilitator implements x402 verify and settle for exact-AVM Algorand 
 
 | Model | Use case |
 | --- | --- |
-| \`llama-3.3-70b-versatile\` | High quality summaries, protocol demo default |
-| \`llama-4-scout-17b-16e-instruct\` | Fast multimodal responses |
+| \`openai/gpt-oss-20b\` | Fast responses, protocol demo default |
+| \`qwen/qwen3.6-27b\` | Higher quality summaries |
 
 **Independence:** payment and AI are decoupled. Settlement must succeed before any Groq call. If Groq fails after payment, the tx is still on-chain — handle this as a fulfillment error in production (retry, refund policy, support).
 

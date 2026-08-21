@@ -191,7 +191,7 @@ Client code should map HTTP status + JSON \`code\` fields to user-friendly recov
 \`\`\`json
 {
   "prompt": "Brief a technical audience on HTTP 402...",
-  "model": "llama-3.3-70b-versatile"
+  "model": "openai/gpt-oss-20b"
 }
 \`\`\`
 
@@ -200,7 +200,7 @@ Client code should map HTTP status + JSON \`code\` fields to user-friendly recov
 \`\`\`json
 {
   "content": "Generated markdown text...",
-  "model": "llama-3.3-70b-versatile",
+  "model": "openai/gpt-oss-20b",
   "latencyMs": 842,
   "usage": { "total_tokens": 412 },
   "settlement": {
