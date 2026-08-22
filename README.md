@@ -61,46 +61,99 @@
 
 **PagePay** is a production-grade reference SaaS application and developer platform demonstrating **autonomous machine-to-machine (M2M) API monetization**. Built natively on the **HTTP 402 Payment Required** standard and settled on **Algorand Testnet (USDC ASA 10458941)**, PagePay eliminates traditional Web2 monetization friction — accounts, email signups, credit card forms, subscriptions, and static API keys — in favor of **instant, micro-metered on-chain settlement**.
 
-### The Web2 API Billing Problem
+---
 
-> [!WARNING]
-> **Web2 API monetization stacks billing as a human-centric bottleneck**:
-> 1. User fills out web sign-up forms → passes CAPTCHAs → verifies email.
-> 2. User inputs a 16-digit credit card number into Stripe checkout.
-> 3. User generates a static bearer API key (`Authorization: Bearer sk-...`).
-> 4. Provider meters usage in a database and invoices monthly.
+### 🚨 The Web2 API Billing Problem
 
-This workflow is **fundamentally broken** for autonomous AI agents:
-- AI agents cannot open web browsers to fill out sign-up forms or solve CAPTCHAs.
-- AI agents do not have corporate credit cards or pass manual KYC/KYB identity checks.
-- Static API keys create massive security vulnerabilities and unlimited financial liabilities if leaked.
+Traditional SaaS API monetization was designed in the early 2000s under a fundamental premise: **APIs are consumed by humans building web applications**. As a result, the entire Web2 billing ecosystem is engineered around human interaction patterns:
+
+```
+[Human Developer] ──> [Web Sign-Up Form] ──> [Solve CAPTCHA / Verify Email] ──> [Stripe Credit Card Form] ──> [Generate Static Bearer Key]
+```
+
+#### The 5 Structural Flaws of Web2 API Billing for Autonomous AI Agents
+
+> [!CAUTION]
+> 1. **The Identity & Sign-Up Bottleneck**:
+>    Autonomous AI agents operate headlessly. An AI agent cannot navigate web sign-up pages, solve hCaptcha/reCAPTCHA challenges, receive SMS verification codes, or verify email confirmation links. Requiring human registration blocks software-to-software commerce entirely.
+>
+> 2. **Payment Instrument Lock-in (Plastic Credit Cards & KYC)**:
+>    Stripe, Chargebee, and traditional payment processors require 16-digit credit card numbers, billing zip codes, 3D Secure OTP approvals, and business KYC/KYB identification. AI agents do not possess credit cards or bank accounts.
+>
+> 3. **The Security Liability of Static Bearer API Keys**:
+>    Web2 APIs rely on static keys (`Authorization: Bearer sk-...`). These keys are frequently leaked in code repositories or client-side bundles. Once compromised, an attacker can drain a developer's credit card until spending limits are reached.
+>
+> 4. **SaaS Subscription Traps & Unfair Prepaid Tiers**:
+>    Web2 APIs force developers into fixed monthly plans ($29/mo, $99/mo) or minimum prepaid token credit bundles ($100 minimum deposit). If an agent only needs to process 1 page of text once, paying a monthly subscription is highly inefficient.
+>
+> 5. **Opaque Black-Box Metering**:
+>    Web2 API providers meter usage in private, centralized databases. Clients have zero cryptographic proof that they were charged accurately or that the requested computational work was performed faithfully.
 
 ---
 
-### The HTTP 402 + Algorand Solution
+### ⚡ The HTTP 402 + Algorand Solution
 
-PagePay collapses onboarding, cost estimation, payment authorization, and settlement into a single standard HTTP request/response loop:
+PagePay solves all 5 structural flaws by reviving the native **HTTP 402 Payment Required** status code and pairing it with **Algorand Testnet (USDC ASA 10458941)** exact micro-metering:
 
-| Feature / Dimension | Web2 SaaS API Billing | PagePay HTTP 402 + Algorand |
+```
+[Client / AI Agent] ──(1) Unpaid POST Request───────> [PagePay API Gateway]
+                    <──(2) HTTP 402 + Machine Quote────
+[Evaluates Policy]  
+[Signs USDC Txn]   ──(3) Retry POST + PAYMENT-SIG───> [Verifies & Settles On-Chain]
+                    <──(4) HTTP 200 + AI Extraction────
+```
+
+#### How PagePay Overcomes Every Web2 Flaw:
+
+> [!TIP]
+> 1. **Zero Registration — 100% Frictionless Access**:
+>    Any machine, agent, or application with an Algorand wallet address can consume the PagePay API instantly. Zero sign-up forms, zero email verification, zero passwords.
+>
+> 2. **Native Cryptographic Payment Settlement**:
+>    Payments settle in stablecoin (**Circle Testnet USDC ASA 10458941**). The agent signs transactions using standard cryptographic keypairs, eliminating plastic credit cards and Stripe forms.
+>
+> 3. **Non-Custodial Ephemeral Authorization**:
+>    PagePay never stores private keys or static API keys. Authorization is scoped **per-request** using cryptographic signatures (`PAYMENT-SIGNATURE`). Leaking a past header conveys zero future access to an attacker.
+>
+> 4. **Exact Micro-Metered Pay-Per-Page Pricing**:
+>    Clients pay strictly for what they consume: **$0.01 USD per parsed document page** (500 words = 1 page). If a document is 2 pages, the payment is exactly $0.02 USD. No monthly fees, no minimum deposits.
+>
+> 5. **Cryptographic Proof & Immutable Audit Chain**:
+>    Every processed transaction generates an on-chain transaction ID (`txId`) and appends a SHA-256 hash entry to a tamper-evident audit log chain. Anyone can verify log integrity via public endpoints (`/api/receipt`, `/api/audit/verify`).
+
+---
+
+### 📊 Web2 SaaS API Billing vs. PagePay HTTP 402 Comparison
+
+| Architectural Dimension | Traditional Web2 SaaS API Billing | PagePay HTTP 402 + Algorand |
 | --- | --- | --- |
-| **Authentication** | Bearer API Keys (`sk-...`) | Non-Custodial Algorand Wallet Signatures |
-| **Account Onboarding** | Required (Forms, Email, Cards) | **Zero Registration** — Completely Frictionless |
-| **Payment Settlement** | Monthly Credit Card Statements | Instant On-Chain Transfer (USDC ASA 10458941) |
-| **Metering Granularity** | Monthly Tier / Minimum Commitments | **Exact Metering per Parsed Page** ($0.01 / page) |
-| **Agent Autonomy** | None (Human intervention required) | **Native** — Agent Spend Policy Guard enforces rules |
-| **Auditability** | Opaque server logs | **Cryptographic SHA-256 Chain + On-Chain Proof** |
+| **Authentication Primitive** | Static Bearer API Keys (`sk-proj-...`) | Ephemeral Cryptographic Signatures (`PAYMENT-SIGNATURE`) |
+| **Account Onboarding** | Required (Web forms, Email verification) | **Zero Registration Required** — Open to any machine |
+| **Payment Instrument** | Plastic Credit Cards (Stripe / Braintree) | Native On-Chain Stablecoin (Circle USDC ASA 10458941) |
+| **Payment Finality** | 30-day chargeback risk / monthly invoicing | **Instant Finality in ~3.3 Seconds** on Algorand |
+| **Metering Granularity** | Monthly tiers ($29/mo) or minimum token packs | **Exact Metering per Parsed Page** ($0.01 / page) |
+| **Agent Autonomy** | Impossible (Human intervention required) | **Native** — Agent Spend Policy Guard enforces caps |
+| **Security Risk** | Leaked key drains credit card balance | Key compromise isolated; client controls wallet caps |
+| **Machine Discovery** | Manual documentation reading | **Self-Describing API** (`GET /api/tools` & HTTP 402 JSON) |
+| **Custody & Trust** | Custodial (Server stores billing info) | **Non-Custodial** (Server never touches private keys) |
+| **Auditability** | Opaque centralized server logs | **SHA-256 Cryptographic Audit Chain + On-Chain Proof** |
 
 ---
 
-### Machine-to-Machine Agent Autonomy Rationale
+### 🤖 Machine-to-Machine Agent Autonomy Rationale
 
-PagePay proves that autonomous machine-to-machine payments are **100% operational today**:
-1. **Machine-Readable Discovery**: AI agents query `GET /api/tools` to discover available endpoints, pricing rules, payment requirements, and extraction modes automatically.
-2. **Self-Describing Payment Quotes**: Unpaid requests return an **HTTP 402 Payment Required** response carrying a base64-encoded `PAYMENT-REQUIRED` header specifying exact cost, asset ID, and merchant receiver address (`payTo`).
-3. **Autonomous Spend Policy Enforcement**: Before generating or signing transactions, the client's **Agent Spend Policy Guard** checks constraints:
+PagePay provides a complete operational framework for **Autonomous Agentic Economic Decision-Making**:
+
+1. **Tool & Endpoint Discovery (`GET /api/tools`)**:
+   AI agents fetch machine-readable JSON metadata describing available API routes, pricing rules, payment requirements, and extraction modes automatically.
+2. **Self-Describing Payment Quoting**:
+   Sending an unpaid request to `/api/summarize` or `/api/compare` returns an **HTTP 402 Payment Required** status code with a `PAYMENT-REQUIRED` header containing the exact cost in micro-units, merchant `payTo` address, and asset ID.
+3. **Client-Side Spend Policy Enforcement**:
+   Before building or signing any transaction, the agent's **Agent Spend Policy Guard** checks constraints locally:
    $$\text{RequestCost} \le \text{MaxPricePerRequestUSD} \quad \land \quad (\text{TotalSpent} + \text{RequestCost}) \le \text{SessionBudgetUSD}$$
-   If limits are exceeded, execution is refused locally before constructing any transaction.
-4. **Sub-3.3 Second Finality**: Algorand Testnet confirms atomic transactions in ~3.3 seconds with instant finality, allowing agents to receive AI results within the same HTTP session.
+   If the price exceeds policy limits, the agent aborts execution locally without making an on-chain transaction or wasting gas.
+4. **Sub-3.3 Second Settlement & Output**:
+   Transactions settle on Algorand in **~3.3 seconds**, allowing the AI agent to receive its AI extraction within the standard HTTP request window.
 
 ---
 
