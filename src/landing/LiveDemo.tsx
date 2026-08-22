@@ -602,18 +602,16 @@ export function LiveDemo({
             )}
           </div>
 
-          {/* ── Range summarization (appears when page count is known) ── */}
-          {(quote?.pages ?? (localPages && localPages > 0 ? localPages : 0)) > 0 && (
-            <div className="lg:col-span-2">
-              <RangeDemo
-                wallet={wallet}
-                totalPages={quote?.pages ?? localPages ?? 0}
-                file={file}
-                text={text}
-                mode={mode}
-              />
-            </div>
-          )}
+          {/* ── Range summarization (always visible in live demo) ── */}
+          <div className="lg:col-span-2">
+            <RangeDemo
+              wallet={wallet}
+              totalPages={quote?.pages ?? localPages ?? 0}
+              file={file}
+              text={text}
+              mode={mode}
+            />
+          </div>
         </div>
       </Container>
     </section>

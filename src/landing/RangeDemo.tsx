@@ -96,14 +96,17 @@ export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: 
   const [phase, setPhase] = useState<PaymentPhase | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
 
+  const hasDoc = Boolean(file) || text.trim().length > 0;
+  const effectiveTotalPages = totalPages > 0 ? totalPages : 1;
+
   // Keep endPage in sync when totalPages changes (e.g. new doc uploaded).
-  const clampedStart = Math.max(1, Math.min(startPage, totalPages || 1));
-  const clampedEnd = Math.max(clampedStart, Math.min(endPage, totalPages || 1));
+  const clampedStart = Math.max(1, Math.min(startPage, effectiveTotalPages));
+  const clampedEnd = Math.max(clampedStart, Math.min(endPage, effectiveTotalPages));
   const rangePages = clampedEnd - clampedStart + 1;
   const rangePrice = priceForPages(rangePages);
 
   // Validation
-  const rangeValid = totalPages > 0 && clampedStart >= 1 && clampedEnd <= totalPages && clampedStart <= clampedEnd;
+  const rangeValid = hasDoc && clampedStart >= 1 && clampedEnd <= effectiveTotalPages && clampedStart <= clampedEnd;
 
   function fail(next: FriendlyError) {
     setError(next);
@@ -233,9 +236,13 @@ export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: 
           <Row label="Range price">
             <span className="font-semibold">{rangePrice}</span>
           </Row>
-          {totalPages > 0 && (
-            <Row label="Document total">{totalPages} page{totalPages === 1 ? "" : "s"}</Row>
-          )}
+          <Row label="Document total">
+            {totalPages > 0
+              ? `${totalPages} page${totalPages === 1 ? "" : "s"}`
+              : hasDoc
+                ? "1 page detected"
+                : "Add a document above to detect pages"}
+          </Row>
         </div>
 
         {phase && (
@@ -247,13 +254,18 @@ export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: 
           </p>
         )}
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-col gap-2">
           <Button
             disabled={running || !rangeValid}
             onClick={() => void handleSummarizeRange()}
           >
             {running ? "Processing…" : `Summarize pages ${clampedStart}–${clampedEnd} (${rangePrice})`}
           </Button>
+          {!hasDoc && (
+            <p className="font-mono text-[11px] text-muted-foreground">
+              ↑ Upload a PDF or paste text in Step 1 above to enable range summarization.
+            </p>
+          )}
         </div>
 
         {error && (
