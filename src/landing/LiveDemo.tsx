@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Bot, FileText, Check, Sparkles } from "lucide-react";
+import { useState, useRef } from "react";
+import { Bot, FileText, Check, Sparkles, Shield, ShieldAlert, SlidersHorizontal, AlertTriangle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,13 @@ import {
   type PaymentFailureCode,
   type PaymentPhase,
 } from "@/lib/x402/client";
+import {
+  runAgentWithPolicy,
+  AgentSessionTracker,
+  DEFAULT_AGENT_POLICY,
+  type AgentSpendPolicy,
+  type PolicyCheckResult,
+} from "@/lib/pagepay/agentPolicy";
 import { cn } from "@/lib/utils";
 
 interface Quote {
@@ -155,6 +162,13 @@ export function LiveDemo({
   const [exchange, setExchange] = useState<PaidRequestResult | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
 
+  // Policy Guard State & Tracker
+  const [policy, setPolicy] = useState<AgentSpendPolicy>(DEFAULT_AGENT_POLICY);
+  const [showPolicyConfig, setShowPolicyConfig] = useState(false);
+  const [policyRefusal, setPolicyRefusal] = useState<PolicyCheckResult | null>(null);
+  const sessionTrackerRef = useRef(new AgentSessionTracker());
+  const agentSession = sessionTrackerRef.current;
+
   const localPages = file ? null : text.trim() ? pagesForText(text) : 0;
   const summary = exchange?.ok ? (exchange.result as SummaryResult) : null;
 
@@ -253,19 +267,66 @@ export function LiveDemo({
   }
 
   async function handleAgentAutopay() {
+    setError(null);
+    setPolicyRefusal(null);
+    setExchange(null);
+
     if (!file && !text.trim()) {
       fail({ message: "Add a document or paste text first." });
       return;
     }
     if (!wallet.signer) {
       fail({
-        message: "Connect Pera Wallet — or use Protocol demo with Judge wallet (no Pera).",
+        message: "Connect Pera Wallet in the header first to run agent requests.",
         action: "connect",
       });
       return;
     }
-    if (!quote) await handleQuote();
-    await handlePayAndSummarize();
+
+    setRunning(true);
+    try {
+      const init: RequestInit = file
+        ? (() => {
+            const form = new FormData();
+            form.set("file", file);
+            form.set("mode", mode);
+            return { method: "POST", body: form };
+          })()
+        : {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ text, mode }),
+          };
+
+      const result = await runAgentWithPolicy(
+        "/api/summarize",
+        init,
+        wallet.signer,
+        policy,
+        agentSession,
+        mode,
+        { onPhase: setPhase },
+      );
+
+      if (!result.allowed) {
+        console.log("[pagepay:policy] Request refused by Agent Spend Policy Guard:", result.refusalReason);
+        setPolicyRefusal(result.policyCheck);
+        return;
+      }
+
+      if (result.paidResult) {
+        setExchange(result.paidResult);
+        if (!result.paidResult.ok) {
+          const friendly = result.paidResult.failureCode ? FAILURE_COPY[result.paidResult.failureCode] : undefined;
+          fail(friendly ?? { message: "Payment execution failed." });
+        }
+      }
+    } catch (runErr) {
+      console.error("[pagepay:agent] execution error", runErr);
+      fail({ message: "Agent execution failed due to an unexpected error." });
+    } finally {
+      setRunning(false);
+    }
   }
 
   const quotedBody = exchange?.unpaid ? safeJson(exchange.unpaid.body) : null;
@@ -455,17 +516,109 @@ export function LiveDemo({
                     </Button>
                   </span>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={running}
-                    className="text-xs font-mono text-muted-foreground hover:text-foreground gap-1.5"
-                    onClick={() => void handleAgentAutopay()}
-                  >
-                    <Bot className="size-3.5" />
-                    Run as agent
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={running}
+                      className="text-xs font-mono text-muted-foreground hover:text-foreground gap-1.5"
+                      onClick={() => void handleAgentAutopay()}
+                    >
+                      <Bot className="size-3.5" />
+                      Run as agent
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground hover:text-foreground"
+                      title="Configure Agent Spend Policy Guard"
+                      onClick={() => setShowPolicyConfig(!showPolicyConfig)}
+                    >
+                      <SlidersHorizontal className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
+
+                {/* ── Policy Guard Status & Config Box ── */}
+                <div className="rounded-lg border border-border/80 bg-background/50 p-3 mt-3 space-y-3 font-mono text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-semibold text-primary">
+                      <Shield className="size-3.5 text-primary" />
+                      <span>AGENT SPEND POLICY GUARD</span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Spent: <strong className="text-foreground">${agentSession.getSpentUsd().toFixed(2)}</strong> / ${policy.sessionBudgetUsd.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {showPolicyConfig && (
+                    <div className="space-y-3 pt-2 border-t border-border/60">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground uppercase">Max / Request ($)</Label>
+                          <input
+                            type="number"
+                            step="0.005"
+                            min="0.001"
+                            value={policy.maxPricePerRequestUsd}
+                            className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-xs font-mono"
+                            onChange={(e) => setPolicy({ ...policy, maxPricePerRequestUsd: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground uppercase">Session Budget ($)</Label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={policy.sessionBudgetUsd}
+                            className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-xs font-mono"
+                            onChange={(e) => setPolicy({ ...policy, sessionBudgetUsd: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground uppercase block mb-1">Allowed Modes</Label>
+                        <div className="flex gap-2">
+                          {(["summary", "action_items", "key_risks"] as const).map((m) => (
+                            <label key={m} className="flex items-center gap-1 cursor-pointer text-[11px]">
+                              <input
+                                type="checkbox"
+                                checked={policy.allowedModes.includes(m)}
+                                onChange={(e) => {
+                                  const updated = e.target.checked
+                                    ? [...policy.allowedModes, m]
+                                    : policy.allowedModes.filter((x) => x !== m);
+                                  setPolicy({ ...policy, allowedModes: updated });
+                                }}
+                              />
+                              <span>{m}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Policy Guard Refusal Banner (Distinct from Wallet/Network Errors) ── */}
+                {policyRefusal && (
+                  <div
+                    className="mt-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3.5 text-xs text-amber-300 font-mono space-y-1.5"
+                    role="alert"
+                  >
+                    <div className="flex items-center gap-2 font-semibold text-amber-400">
+                      <ShieldAlert className="size-4 shrink-0" />
+                      <span>BLOCKED BY AGENT SPEND POLICY GUARD</span>
+                    </div>
+                    <p className="leading-relaxed text-amber-200">{policyRefusal.reason}</p>
+                    <div className="pt-1 text-[11px] text-amber-400/80 flex items-center justify-between border-t border-amber-500/20">
+                      <span>No payment constructed or signed.</span>
+                      <span>Rule: {policyRefusal.ruleViolated}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {!wallet.address && (
