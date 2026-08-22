@@ -238,7 +238,7 @@ export async function compareDocuments(
         { role: "system", content: COMPARISON_SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
-      maxTokens: 1200,
+      maxTokens: 2000,
     });
     return res.content;
   } catch (error) {

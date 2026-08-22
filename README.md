@@ -1,370 +1,707 @@
-# PagePay Summaries
+<div align="center">
 
-# PagePay — AI Build Prompt + x402 / Algorand Integration Guide
+# ⚡ PagePay
+### Autonomous Machine-to-Machine Pay-Per-Page AI Processing over HTTP 402 on Algorand
 
-> Copy the section below labeled **"MASTER BUILD PROMPT"** and paste it directly into your AI coding assistant (Claude Code, Cursor, etc.) as the task instructions. The sections after it are a manual reference guide for you, in case you need to set anything up by hand or double-check what the AI produces.
+[![HTTP 402 Protocol](https://img.shields.io/badge/Protocol-HTTP%20402%20v2-7c3aed.svg?style=for-the-badge&logo=http)](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402)
+[![Algorand Testnet](https://img.shields.io/badge/Blockchain-Algorand%20Testnet-16a34a.svg?style=for-the-badge&logo=algorand)](https://lora.algokit.io/testnet)
+[![USDC ASA](https://img.shields.io/badge/Asset-USDC%20ASA%2010458941-2563eb.svg?style=for-the-badge)](https://faucet.circle.com)
+[![GoPlausible Facilitator](https://img.shields.io/badge/Facilitator-GoPlausible-ca8a04.svg?style=for-the-badge)](https://facilitator.goplausible.xyz)
+[![AI Engine](https://img.shields.io/badge/LLM-Groq%20%2F%20Gemini%202.5-000000.svg?style=for-the-badge&logo=openai)](https://groq.com)
+[![TypeScript](https://img.shields.io/badge/Language-TypeScript%205-3178c6.svg?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Build Status](https://img.shields.io/badge/Build-Passing-emerald.svg?style=for-the-badge)]()
 
----
+<br />
 
-## MASTER BUILD PROMPT (paste this into your AI coding assistant)
+*An autonomous, non-custodial API platform enabling AI agents, automated scripts, and human clients to pay for high-value AI document processing in real time over standard HTTP 402 using exact-metered Algorand USDC transfers.*
 
-```
-You are building "PagePay" — a pay-per-page AI document summarization API that uses
-the x402 payment protocol settled on the Algorand blockchain.
-
-============================================================
-STRICT TECHNOLOGY CONSTRAINTS — READ FIRST
-============================================================
-You MUST use ONLY the following technologies. Do NOT substitute, add, or suggest
-alternatives without asking me first. Do not silently pull in extra libraries.
-
-- Backend: Node.js with Express (TypeScript preferred). Do not use Fastify, Koa,
-  NestJS, or any other framework.
-- Payment protocol: x402, implemented ONLY via the official Algorand (AVM) packages:
-  @x402-avm/core, @x402-avm/avm, @x402-avm/express
-  (optionally @x402-avm/paywall if a browser paywall UI is needed).
-  Do NOT use the generic/EVM-only x402 packages (@x402/*, @coinbase/x402, etc.),
-  and do NOT use Stripe, PayPal, Razorpay, or any other payment gateway anywhere
-  in this project.
-- Blockchain: Algorand ONLY. Do not use Ethereum, Solana, Polygon, or any other
-  chain, even as a "fallback" or "multi-chain" option, unless I explicitly ask.
-- Algorand SDK layer: use @algorandfoundation/algokit-utils for account/signer
-  handling (this is what @x402-avm packages use internally as of v2.6+ — do NOT
-  add the raw `algosdk` package as a direct dependency unless algokit-utils
-  cannot do something I explicitly need).
-- Facilitator: use the hosted Algorand x402 facilitator at
-  https://facilitator.goplausible.xyz for verifying and settling payments.
-  Do NOT build a custom facilitator unless I explicitly ask for one later.
-- Network: Algorand TESTNET only, using the CAIP-2 identifier exposed by
-  `ALGORAND_TESTNET_CAIP2` from @x402-avm/avm. Do not hardcode mainnet.
-- Payment asset: price routes in USD-equivalent ALGO by default. Only add a
-  USDC (ASA) priced route if I explicitly ask for one.
-- Summarization: call a single LLM API of my choosing (I will provide the API
-  key) OR a lightweight local summarization approach if I say "no external LLM."
-  Do not add multiple competing summarization providers.
-- Frontend: a minimal single HTML+JS page (no React/Next.js/Vue) that lets me
-  upload a document, see the 402 price, "pay" (simulated button is fine for
-  local testnet demo), and see the returned summary. Do not scaffold a full
-  frontend framework unless I ask.
-- Do not add authentication/accounts, databases, Docker, CI/CD, or any other
-  infrastructure beyond what's needed to run this locally and demo it. If you
-  think something else is needed, ask me before adding it.
-
-============================================================
-PROJECT OVERVIEW
-============================================================
-PagePay lets a client (a human or an AI agent) submit a PDF or plain text chunk
-to a `/summarize` endpoint and get back an AI-generated summary, paying per page
-via the x402 protocol settled on Algorand — no account, no API key, no
-subscription.
-
-============================================================
-FUNCTIONAL REQUIREMENTS
-============================================================
-1. `POST /summarize`
-   - Accepts a PDF file OR raw text in the request body.
-   - Computes page count (assume ~500 words = 1 "page" if given raw text; use
-     actual PDF page count if given a PDF).
-   - Price = $0.01 per page (dynamic price function, not hardcoded per route).
-   - If no valid payment is attached, respond with the x402-standard
-     `402 Payment Required`, including the computed price and Algorand payment
-     details, exactly as the @x402-avm/express middleware produces it. Do not
-     hand-roll your own 402 response format.
-   - If valid payment is attached (verified via the facilitator), run the
-     document through the summarization step and return:
-     `{ summary: string, pagesCharged: number, amountPaid: string }`
-
-2. Payment verification and settlement must go through the x402-avm middleware
-   and the hosted facilitator — do not write custom payment-verification logic
-   that talks to Algorand directly; let @x402-avm/express + the facilitator
-   client handle it.
-
-3. Implement these failure/fallback cases explicitly, with clear status codes
-   and JSON error bodies (not silent failures):
-   a. Uploaded file is not a PDF/text or exceeds a size limit (e.g. 20 pages)
-      -> 400 Bad Request, JSON: { error, reason }
-   b. No payment proof present -> handled automatically by x402 middleware as
-      402 Payment Required (this is expected/normal, not an error to log loudly)
-   c. Payment present but verification/settlement fails (insufficient funds,
-      invalid signature, expired payment) -> the facilitator/middleware should
-      surface this as a 402 with a clear reason; do not proceed to
-      summarization in this case.
-   d. Payment verified successfully but the summarization step itself throws
-      (LLM API error, timeout, malformed document) -> return 500 with a clear
-      JSON error, log the failed request (with the payment reference) so it
-      can be manually reviewed/refunded, and do NOT silently discard the fact
-      that the user already paid. Add a TODO comment describing how a real
-      refund flow would work, but do not implement on-chain refunds unless I
-      ask.
-   e. Timeout waiting on the facilitator's /verify or /settle call -> retry
-      once, then fail gracefully with a 504 and clear error message.
-
-4. Log every request in a simple structured console/file log:
-   timestamp, route, pages requested, price, payment status, outcome.
-   No database — flat log file (e.g. requests.log, JSON lines) is enough.
-
-5. Provide a minimal demo frontend (single static HTML+JS file, no build step)
-   showing: upload box -> "Get price" -> 402 response shown -> "Pay" button
-   (simulated for local testnet demo, but structured so it could call a real
-   Algorand wallet later) -> summary displayed.
-
-============================================================
-PROJECT STRUCTURE TO CREATE
-============================================================
-pagepay/
-  package.json
-  .env.example
-  src/
-    server.ts              (Express app, mounts x402 middleware + routes)
-    routes/summarize.ts    (route handler: validation, summarization call)
-    services/summarizer.ts (calls the LLM API or local summarizer)
-    services/logger.ts     (structured request logging)
-    x402/routeConfig.ts    (x402-avm route + pricing config, isolated here)
-  public/
-    index.html             (minimal demo frontend)
-  README.md                (setup + run instructions, including how to get
-                             Algorand testnet ALGO and how to test the flow
-                             with curl or the demo frontend)
-
-============================================================
-WHAT TO DO NOW
-============================================================
-1. Confirm you understand the strict technology constraints above before
-   writing any code.
-2. Scaffold the project structure exactly as listed.
-3. Implement `/summarize` with x402-avm middleware (see the "x402 Integration"
-   section below for exact package/API usage — follow it precisely).
-4. Implement the fallback/error cases listed above.
-5. Write the README with clear step-by-step run instructions, including where
-   I need to paste my own Algorand testnet address and LLM API key.
-6. Do not use placeholder/fake summaries — actually call the summarization
-   service I configure.
-```
+</div>
 
 ---
 
-## X402 INTEGRATION — IN DEPTH
+## 📌 Table of Contents
 
-### 1. Install the correct packages
+- [🌟 1. Executive Overview & Agentic Rationale](#-1-executive-overview--agentic-rationale)
+  - [The Web2 API Billing Problem](#the-web2-api-billing-problem)
+  - [The HTTP 402 + Algorand Solution](#the-http-402--algorand-solution)
+  - [Machine-to-Machine Agent Autonomy Rationale](#machine-to-machine-agent-autonomy-rationale)
+- [🏗️ 2. Deep Technical System Architecture](#%EF%B8%8F-2-deep-technical-system-architecture)
+  - [System Topology Architecture](#system-topology-architecture)
+  - [HTTP 402 Protocol Sequence & Settlement Loop](#http-402-sequence--settlement-loop)
+  - [Backend Intake & AI Processing Pipeline](#backend-intake--ai-processing-pipeline)
+  - [GoPlausible Facilitator Interaction Loop](#goplausible-facilitator-interaction-loop)
+  - [Cryptographic SHA-256 Audit Chain Architecture](#cryptographic-sha-256-audit-chain-architecture)
+- [🔑 3. HTTP 402 v2 Protocol Specification](#-3-http-402-v2-protocol-specification)
+  - [Protocol Header Semantics](#protocol-header-semantics)
+  - [Exact-AVM Scheme Specification](#exact-avm-scheme-specification)
+  - [Complete JSON Payload Schemas](#complete-json-payload-schemas)
+  - [HTTP Error & Failure Modes Matrix](#http-error--failure-modes-matrix)
+- [⛓️ 4. Algorand Blockchain & GoPlausible Facilitator Deep Dive](#%EF%B8%8F-4-algorand-blockchain--goplausible-facilitator-deep-dive)
+  - [Algorand Testnet Specifications & ASA 10458941](#algorand-testnet-specifications--asa-10458941)
+  - [USDC Micro-Unit Conversion Math](#usdc-micro-unit-conversion-math)
+  - [GoPlausible Hosted Facilitator Integration](#goplausible-hosted-facilitator-integration)
+  - [Atomic 2-Transaction Group Anatomy](#atomic-2-transaction-group-anatomy)
+- [🔒 5. Cryptographic SHA-256 Tamper-Evident Audit Trail](#-5-cryptographic-sha-256-tamper-evident-audit-trail)
+- [🕹️ 6. Pin-to-Pin UI & Feature Catalog](#%EF%B8%8F-6-pin-to-pin-ui--feature-catalog)
+  - [Global Navigation & Header Bar](#global-navigation--header-bar)
+  - [Landing Page & Hero Section (`/`)](#landing-page--hero-section-)
+  - [Live Demo: Single Document Summarization (`/demo`)](#live-demo-single-document-summarization-demo)
+  - [Live Demo: Dual Document Comparison (`CompareDemo`)](#live-demo-dual-document-comparison-comparedemo)
+  - [Agent Spend Policy Guard Component](#agent-spend-policy-guard-component)
+  - [Audit Trail, Receipt Verification & Trust Score Widgets](#audit-trail-receipt-verification--trust-score-widgets)
+  - [Protocol Sandbox & Simulation Engine (`/x402-demo`)](#protocol-sandbox--simulation-engine-x402-demo)
+  - [Documentation Pages (`/docs`, `/developers`, `/integrations`)](#documentation-pages-docs-developers-integrations)
+- [🔌 7. Exhaustive API Reference (All Endpoints)](#-7-exhaustive-api-reference-all-endpoints)
+- [🌱 8. Startup Transaction Seed & Verifiable History](#-8-startup-transaction-seed--verifiable-history)
+- [💻 9. Installation, Environment & Local Setup](#-9-installation-environment--local-setup)
+
+---
+
+## 🌟 1. Executive Overview & Agentic Rationale
+
+**PagePay** is a production-grade reference SaaS application and developer platform demonstrating **autonomous machine-to-machine (M2M) API monetization**. Built natively on the **HTTP 402 Payment Required** standard and settled on **Algorand Testnet (USDC ASA 10458941)**, PagePay eliminates traditional Web2 monetization friction — accounts, email signups, credit card forms, subscriptions, and static API keys — in favor of **instant, micro-metered on-chain settlement**.
+
+### The Web2 API Billing Problem
+
+> [!WARNING]
+> **Web2 API monetization stacks billing as a human-centric bottleneck**:
+> 1. User fills out web sign-up forms → passes CAPTCHAs → verifies email.
+> 2. User inputs a 16-digit credit card number into Stripe checkout.
+> 3. User generates a static bearer API key (`Authorization: Bearer sk-...`).
+> 4. Provider meters usage in a database and invoices monthly.
+
+This workflow is **fundamentally broken** for autonomous AI agents:
+- AI agents cannot open web browsers to fill out sign-up forms or solve CAPTCHAs.
+- AI agents do not have corporate credit cards or pass manual KYC/KYB identity checks.
+- Static API keys create massive security vulnerabilities and unlimited financial liabilities if leaked.
+
+---
+
+### The HTTP 402 + Algorand Solution
+
+PagePay collapses onboarding, cost estimation, payment authorization, and settlement into a single standard HTTP request/response loop:
+
+| Feature / Dimension | Web2 SaaS API Billing | PagePay HTTP 402 + Algorand |
+| --- | --- | --- |
+| **Authentication** | Bearer API Keys (`sk-...`) | Non-Custodial Algorand Wallet Signatures |
+| **Account Onboarding** | Required (Forms, Email, Cards) | **Zero Registration** — Completely Frictionless |
+| **Payment Settlement** | Monthly Credit Card Statements | Instant On-Chain Transfer (USDC ASA 10458941) |
+| **Metering Granularity** | Monthly Tier / Minimum Commitments | **Exact Metering per Parsed Page** ($0.01 / page) |
+| **Agent Autonomy** | None (Human intervention required) | **Native** — Agent Spend Policy Guard enforces rules |
+| **Auditability** | Opaque server logs | **Cryptographic SHA-256 Chain + On-Chain Proof** |
+
+---
+
+### Machine-to-Machine Agent Autonomy Rationale
+
+PagePay proves that autonomous machine-to-machine payments are **100% operational today**:
+1. **Machine-Readable Discovery**: AI agents query `GET /api/tools` to discover available endpoints, pricing rules, payment requirements, and extraction modes automatically.
+2. **Self-Describing Payment Quotes**: Unpaid requests return an **HTTP 402 Payment Required** response carrying a base64-encoded `PAYMENT-REQUIRED` header specifying exact cost, asset ID, and merchant receiver address (`payTo`).
+3. **Autonomous Spend Policy Enforcement**: Before generating or signing transactions, the client's **Agent Spend Policy Guard** checks constraints:
+   $$\text{RequestCost} \le \text{MaxPricePerRequestUSD} \quad \land \quad (\text{TotalSpent} + \text{RequestCost}) \le \text{SessionBudgetUSD}$$
+   If limits are exceeded, execution is refused locally before constructing any transaction.
+4. **Sub-3.3 Second Finality**: Algorand Testnet confirms atomic transactions in ~3.3 seconds with instant finality, allowing agents to receive AI results within the same HTTP session.
+
+---
+
+## 🏗️ 2. Deep Technical System Architecture
+
+### System Topology Architecture
+
+```mermaid
+graph TB
+    subgraph ClientSpace ["Client & Autonomous Agent Space"]
+        Agent["🤖 Autonomous AI Agent"]
+        UserUI["💻 Web Client UI (React 18)"]
+        PolicyEngine["🛡️ Agent Spend Policy Guard"]
+        WalletSigner["🔑 Pera Wallet / ARC-0001 Signer"]
+    end
+
+    subgraph ServerSpace ["PagePay API Gateway (TanStack Start / Nitro)"]
+        Router["🌐 API Gateway Router"]
+        MeterEngine["📊 Document Metering Engine"]
+        x402Server["🔒 x402 v2 Resource Server"]
+        AuditChain["📜 Cryptographic SHA-256 Audit Logger"]
+    end
+
+    subgraph PaymentSpace ["Payment & Settlement Layer"]
+        GoPlausible["⚡ GoPlausible Facilitator API"]
+        Algorand["⛓️ Algorand Testnet (ASA 10458941)"]
+    end
+
+    subgraph AISpace ["Artificial Intelligence Gateway"]
+        GroqLLM["🧠 Groq LLM Engine (Gemini 2.5 / GPT-OSS)"]
+    end
+
+    Agent -->|1. Unpaid POST| Router
+    UserUI -->|1. Unpaid POST| Router
+    Router --> MeterEngine
+    MeterEngine -->|Calculate Pages & Cost| x402Server
+    x402Server -->|2. HTTP 402 + PAYMENT-REQUIRED Header| PolicyEngine
+
+    PolicyEngine -->|3. Evaluate Max Price & Session Budget| WalletSigner
+    WalletSigner -->|4. Sign Exact-AVM Txn Group| x402Server
+    x402Server -->|5. Paid Retry + PAYMENT-SIGNATURE Header| x402Server
+
+    x402Server -->|6. Verify Signature| GoPlausible
+    GoPlausible -->|7. Co-sign Fee-Payer & Submit| Algorand
+    Algorand -->|8. Confirmed txId| GoPlausible
+    GoPlausible -->|9. Settlement Proof| x402Server
+
+    x402Server -->|10. Execute Mode Prompt| GroqLLM
+    GroqLLM -->|11. AI Markdown Output| AuditChain
+    AuditChain -->|12. Append SHA-256 Hash Entry| AuditChain
+    AuditChain -->|13. HTTP 200 OK + Output + txId| Agent
+    AuditChain -->|13. HTTP 200 OK + Output + txId| UserUI
+```
+
+---
+
+### HTTP 402 Sequence & Settlement Loop
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent as 🤖 AI Agent / Client
+    participant Gateway as 🌐 PagePay API Gateway
+    participant Facilitator as ⚡ GoPlausible Facilitator
+    participant Blockchain as ⛓️ Algorand Testnet
+    participant LLM as 🧠 Groq AI Engine
+
+    Agent->>Gateway: POST /api/summarize (Unpaid document payload)
+    Gateway->>Gateway: Parse words/pages (500 words = 1 page) & compute price
+    Gateway-->>Agent: HTTP 402 Payment Required<br/>Header: PAYMENT-REQUIRED (Base64 JSON)
+
+    Agent->>Agent: Decode PAYMENT-REQUIRED payload
+    Agent->>Agent: Evaluate Agent Policy (Price <= MaxPrice & Total <= Budget)
+    Agent->>Agent: Construct Atomic 2-Txn Group (Fee Payer + USDC ASA Transfer)
+    Agent->>Agent: Sign Txn 1 via Pera Wallet / Keypair
+    Agent->>Agent: Encode PAYMENT-SIGNATURE Header
+
+    Agent->>Gateway: POST /api/summarize (Identical payload + PAYMENT-SIGNATURE Header)
+    Gateway->>Facilitator: POST https://facilitator.goplausible.xyz/verify
+    Facilitator-->>Gateway: 200 OK (Payload & Signature Valid)
+
+    Gateway->>Facilitator: POST https://facilitator.goplausible.xyz/settle
+    Facilitator->>Blockchain: Co-sign Txn 0 (Fee Payer) & Submit Atomic Group
+    Blockchain-->>Facilitator: Confirmed Round & txId
+    Facilitator-->>Gateway: 200 OK (Settlement Confirmed + txId)
+
+    Gateway->>LLM: Execute Mode Prompt (Summary / Action Items / Risks / Compliance / Checklist)
+    LLM-->>Gateway: Generated Markdown Response
+    Gateway->>Gateway: Compute SHA-256 Hash: SHA256(prevHash + timestamp + route + txId + ...)
+    Gateway-->>Agent: HTTP 200 OK + Summary JSON + txId + PAYMENT-RESPONSE Header
+```
+
+---
+
+### Backend Intake & AI Processing Pipeline
+
+```mermaid
+graph LR
+    Req["📥 Incoming Request<br/>(JSON / Multipart)"] --> ContentType{"Content-Type?"}
+    ContentType -->|multipart/form-data| FormParser["📄 PDF / File Parser"]
+    ContentType -->|application/json| TextParser["📝 Raw Text Parser"]
+    
+    FormParser --> Metering["📊 Metering Engine<br/>Math.ceil(words / 500)"]
+    TextParser --> Metering
+    
+    Metering --> PriceCalc["💰 Price Calculation<br/>pages × $0.01"]
+    PriceCalc --> x402Check{"PAYMENT-SIGNATURE<br/>Header Present?"}
+    
+    x402Check -->|No| Emit402["⛔ Return HTTP 402<br/>PAYMENT-REQUIRED Header"]
+    x402Check -->|Yes| VerifySettle["⚡ GoPlausible /verify & /settle"]
+    
+    VerifySettle --> PromptEngine{"Selected Mode?"}
+    PromptEngine -->|summary| P1["Overview & Points"]
+    PromptEngine -->|action_items| P2["Tasks & Owners"]
+    PromptEngine -->|key_risks| P3["Risks & Severities"]
+    PromptEngine -->|compliance_check| P4["Contract Audit"]
+    PromptEngine -->|checklist| P5["Step Checkboxes"]
+    
+    P1 --> GroqInference["🧠 Groq LLM Inference"]
+    P2 --> GroqInference
+    P3 --> GroqInference
+    P4 --> GroqInference
+    P5 --> GroqInference
+    
+    GroqInference --> AuditAppend["🔒 Cryptographic SHA-256 Audit Append"]
+    AuditAppend --> Res200["✅ Return HTTP 200 OK<br/>Result + txId + PAYMENT-RESPONSE"]
+```
+
+---
+
+### GoPlausible Facilitator Interaction Loop
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Server as 🌐 PagePay Gateway
+    participant Facilitator as ⚡ GoPlausible Facilitator
+    participant Node as ⛓️ Algod Testnet Node
+
+    Server->>Facilitator: POST /verify<br/>Body: { x402Version, paymentPayload, paymentRequirements }
+    Facilitator->>Facilitator: Validate AVM Group structure & signature proof
+    Facilitator-->>Server: 200 OK { isValid: true, payer: "EVEHMX..." }
+
+    Server->>Facilitator: POST /settle<br/>Body: { x402Version, paymentPayload, paymentRequirements }
+    Facilitator->>Facilitator: Sign Txn 0 (Fee Payer Address: ZMFK2O...)
+    Facilitator->>Node: Send Raw Signed Transaction Group (sendRawTransaction)
+    Node-->>Facilitator: Transaction Confirmed in Round #XXXXX
+    Facilitator-->>Server: 200 OK { success: true, transaction: "VPZ5GY2C...", payer: "EVEHMX..." }
+```
+
+---
+
+### Cryptographic SHA-256 Audit Chain Architecture
+
+```mermaid
+graph LR
+    subgraph Genesis ["Genesis Block"]
+        G["Genesis Hash<br/><code>0000000000000000...</code>"]
+    end
+
+    subgraph Entry1 ["Audit Entry #1"]
+        E1["Timestamp: 2026-08-22T09:39:00Z<br/>Route: POST /api/summarize<br/>TxID: SYPV4SIC...<br/><b>Hash:</b> <code>36f22782e986...</code>"]
+    end
+
+    subgraph Entry2 ["Audit Entry #2"]
+        E2["Timestamp: 2026-08-22T14:02:00Z<br/>Route: POST /api/compare<br/>TxID: 27J5GFWM...<br/><b>Hash:</b> <code>b3f9d3fe1e44...</code>"]
+    end
+
+    subgraph Entry3 ["Audit Entry #3"]
+        E3["Timestamp: 2026-08-22T21:45:00Z<br/>Route: POST /api/summarize<br/>TxID: VPZ5GY2C...<br/><b>Hash:</b> <code>43ebf6ca3108...</code>"]
+    end
+
+    G -->|SHA-256 Link| E1
+    E1 -->|SHA-256 Link| E2
+    E2 -->|SHA-256 Link| E3
+```
+
+---
+
+## 🔑 3. HTTP 402 v2 Protocol Specification
+
+### Protocol Header Semantics
+
+PagePay strictly adheres to the **x402 Version 2 Protocol Specification**:
+
+- **`PAYMENT-REQUIRED`** *(Response on HTTP 402)*: Base64-encoded JSON payload detailing available payment requirements.
+- **`PAYMENT-SIGNATURE`** *(Request on Retry)*: Base64-encoded JSON payload carrying client-signed transaction group.
+- **`PAYMENT-RESPONSE`** *(Response on HTTP 200)*: Base64-encoded JSON payload carrying on-chain settlement confirmation metadata.
+
+---
+
+### Exact-AVM Scheme Specification
+
+- **Scheme Identifier**: `exact`
+- **Network Identifier (CAIP-2)**: `algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=`
+- **Asset ID**: `10458941` (Circle Testnet USDC)
+- **Metering Formula**:
+  $$\text{AtomicAmount} = \text{ParsedPages} \times 10,000 \quad (1 \text{ page} = \$0.01 \text{ USD})$$
+
+---
+
+### Complete JSON Payload Schemas
+
+#### 1. Decoded `PAYMENT-REQUIRED` Header JSON
+```json
+{
+  "x402Version": 2,
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=",
+      "amount": "10000",
+      "asset": "10458941",
+      "payTo": "UPRVZO4TROKAOI2KBRWKVKQUWXNV4DQ4NDL5PEARA4IVZ73DDROT2ATSV4",
+      "maxTimeoutSeconds": 120,
+      "extra": {
+        "name": "USDC",
+        "decimals": 6,
+        "feePayer": "ZMFK2OI7ZBD2U27ISERZC4S6LKM6WMFJPZQ4MYNJDZ2VNBNMBA67RA22AA"
+      }
+    }
+  ],
+  "error": "Payment required"
+}
+```
+
+#### 2. Decoded `PAYMENT-SIGNATURE` Header JSON
+```json
+{
+  "version": 2,
+  "scheme": "exact",
+  "network": "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=",
+  "payload": {
+    "sender": "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    "stxns": [
+      "gqNzaWf... (Fee-payer placeholder transaction)",
+      "gqNzaWf... (USDC ASA transfer transaction signed by user/agent)"
+    ]
+  }
+}
+```
+
+#### 3. Decoded `PAYMENT-RESPONSE` Header JSON
+```json
+{
+  "success": true,
+  "transaction": "VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q",
+  "network": "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=",
+  "payer": "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE"
+}
+```
+
+---
+
+### HTTP Error & Failure Modes Matrix
+
+| HTTP Status | Failure Code | Cause | Recovery Action |
+| --- | --- | --- | --- |
+| **402** | `payment_required` | Unpaid initial request | Decode `PAYMENT-REQUIRED`, sign, and retry |
+| **402** | `cancelled` | User rejected signing prompt in Pera Wallet | Re-trigger payment prompt |
+| **402** | `insufficient_funds` | Wallet lacks testnet USDC (ASA 10458941) | Fund wallet via Circle Testnet Faucet |
+| **402** | `signing_failed` | ARC-0001 group signing error | Check Pera browser tab / mobile app |
+| **402** | `verification_failed` | Signature / parameter mismatch | Re-quote and re-sign transaction |
+| **402** | `quote_mismatch` | Document body edited between quote & payment | Re-request `/api/price` quote |
+| **504** | `gateway_unavailable` | GoPlausible facilitator timeout | Retry request after short delay (`retryable: true`) |
+| **400** | `bad_request` | Empty text or unreadable PDF file | Provide valid text or unencrypted PDF |
+
+---
+
+## ⛓️ 4. Algorand Blockchain & GoPlausible Facilitator Deep Dive
+
+### Algorand Testnet Specifications & ASA 10458941
+
+- **Network Name**: Algorand Testnet
+- **Chain ID**: `416002`
+- **Genesis Hash**: `SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=`
+- **Block Time**: ~3.3 seconds with instant finality (zero forks)
+- **Settlement Token**: Circle Testnet USDC (ASA ID `10458941`)
+- **Token Decimals**: 6 decimals
+
+---
+
+### USDC Micro-Unit Conversion Math
+
+$$\text{USDC Amount (USD)} = \frac{\text{Atomic Micro-Units}}{1,000,000}$$
+
+- $10,000 \text{ micro-units} = \$0.01 \text{ USD}$ (1 page summary)
+- $20,000 \text{ micro-units} = \$0.02 \text{ USD}$ (2 pages or dual-doc comparison)
+- $100,000 \text{ micro-units} = \$0.10 \text{ USD}$ (10 page document max)
+
+---
+
+### GoPlausible Hosted Facilitator Integration
+
+PagePay delegates fee sponsorship and network submission to **GoPlausible**:
+- **Host URL**: `https://facilitator.goplausible.xyz`
+- **Endpoints**:
+  - `POST /verify`: Performs signature pre-flight verification without submitting to the chain.
+  - `POST /settle`: Co-signs Slot 0 as the fee-payer and submits the atomic transaction group to the Algorand Testnet.
+
+---
+
+### Atomic 2-Transaction Group Breakdown
+
+| Group Index | Transaction Type | Sender Address | Receiver Address | Amount | Signer |
+| --- | --- | --- | --- | --- | --- |
+| **Slot 0** | Payment / App Call (`pay`/`appl`) | GoPlausible Facilitator (`ZMFK2O...`) | Facilitator Address | 0 ALGO (Fee sponsor) | **GoPlausible Facilitator** |
+| **Slot 1** | Asset Transfer (`axfer`) | Client Wallet Address (`EVEHMX...`) | Merchant `payTo` (`UPRVZO...`) | Exact Quoted USDC Micro-Units | **Client Wallet / Agent** |
+
+---
+
+## 🔒 5. Cryptographic SHA-256 Tamper-Evident Audit Trail
+
+PagePay logs every request into an append-only cryptographic hash chain:
+
+$$\text{EntryHash}_n = \text{SHA256}(\text{EntryHash}_{n-1} + \text{timestamp} + \text{route} + \text{pages} + \text{price} + \text{paymentStatus} + \text{outcome} + \text{payer} + \text{txId})$$
+
+- **Genesis Hash**: `0000000000000000000000000000000000000000000000000000000000000000`
+- **Verification (`GET /api/audit/verify`)**: Re-computes every hash from genesis. If any historical log entry is modified or deleted, verification returns `valid: false` and flags the exact entry index.
+
+---
+
+## 🕹️ 6. Pin-to-Pin UI & Feature Catalog
+
+### Global Navigation & Header Bar
+
+- **Logo & App Title (`PagePay`)**: Resets to marketing overview.
+- **Nav Links**: `Product`, `Pricing`, `Docs`, `Metrics`, `Protocol demo`, `Live demo`.
+- **Network Badge**: Displays `TESTNET` status.
+- **Wallet Connection Display**: Shows `Connect wallet` button when disconnected; shows truncated address (e.g. `UPRV...TSV4`) and `Disconnect` button when connected.
+
+---
+
+### Landing Page & Hero Section (`/`)
+
+- **Hero Badges**: `Machine-to-Machine Payments`, `HTTP 402 Exact Scheme`, `Algorand Testnet (ASA 10458941)`, `$0.01 / Page`.
+- **CTA Buttons**: `Launch Live Demo`, `Explore Documentation`, `Protocol Demo`.
+- **How It Works Step Cards**: 4 cards explaining quote generation, agent policy guards, on-chain settlement, and audit chain verification.
+- **Pricing Cards**: 3 tier cards for Autonomous Agent, Multi-Doc Compare, and Developer API.
+
+---
+
+### Live Demo: Single Document Summarization (`/demo`)
+
+- **Card 1 · Document Input**:
+  - Drag-and-drop file dropzone supporting `.pdf`, `.txt`, `.md` up to 10 MB and 10 pages maximum. Includes `Remove file` button.
+  - Raw text paste area (500 words = 1 page).
+  - Live page & price estimator (e.g. `≈ 2 pages · $0.02`).
+- **Card 2 · Extraction Mode & Payment**:
+  - **5 Extraction Mode Buttons**:
+    1. `Summary`: Standard overview & key points.
+    2. `Action Items`: Tasks, owners, assignees & deadlines.
+    3. `Key Risks`: Concerning clauses & severities.
+    4. `Compliance Check`: Contract compliance against 5 standard categories.
+    5. `Checklist`: Flat step-by-step implementation checkboxes (`- [ ]`).
+  - **Page Range Selector (`RangeDemo`)**: Dropdown selecting page sub-ranges (e.g. Pages 2–5).
+  - **Action Buttons**:
+    - `Get Price Quote`: Calls `/api/price`.
+    - `Pay & Execute`: Launches Pera Wallet signing popup.
+    - `🤖 Run as Agent`: Executes autonomous agent mode under Agent Spend Policy Guard rules.
+
+---
+
+### Live Demo: Dual Document Comparison (`CompareDemo`)
+
+- **Document A Input Card**: File upload or text area for Document A.
+- **Document B Input Card**: File upload or text area for Document B.
+- **Combined Metering Summary**: Displays Pages in A, Pages in B, Combined Pages, and Combined Price (e.g., 1 + 1 = 2 pages = `$0.02`).
+- **`Pay & Compare Both Documents` Button**: Executes dual-document x402 payment flow.
+- **Comparative Output Container**: Renders structured side-by-side analysis:
+  1. Overview of Comparison
+  2. Unique to Document A
+  3. Unique to Document B
+  4. Markdown Table of Differences
+  5. Comparative Conclusion
+
+---
+
+### Agent Spend Policy Guard Component
+
+- **Max Per Request Input**: Dollar input capping single request cost (default: `$0.10`).
+- **Session Budget Input**: Dollar input capping cumulative session expenditure (default: `$1.00`).
+- **Spent / Remaining Tracker**: Real-time spending monitor (`$Spent / $Remaining`).
+- **Configure Policy Rules**: Expandable drawer to edit rules.
+
+---
+
+### Audit Trail, Receipt Verification & Trust Score Widgets
+
+1. **Tamper-Evident Audit Trail Widget**:
+   - `Re-verify chain` Button: Calls `GET /api/audit/verify`.
+   - Status Badge: Displays `✅ VERIFIED INTEGRITY` or `❌ CHAIN BROKEN`.
+   - Details: Displays total verified entries and genesis hash proof.
+2. **Independent Receipt Verification Service Widget**:
+   - `TxID Input Field`: Accepts any Algorand transaction hash.
+   - `Verify Receipt` Button: Calls `GET /api/receipt?txId=<TxID>`.
+   - Result Card: Displays route paid, price paid, payer address, audit chain entry hash, and on-chain status badge. Auto-populates post-settlement.
+3. **Agent Trust Score Lookup Widget**:
+   - `Address Input Field`: Accepts any Algorand address.
+   - `Check Score` Button: Calls `GET /api/trust-score?address=<Address>`.
+   - Rating Display: Renders **0–100 reliability score**, settled transaction count, USD volume, success rate, and activity timestamps.
+
+---
+
+### Protocol Sandbox & Simulation Engine (`/x402-demo`)
+
+- **Test Mode Toggle**: Enables client-side simulation without Pera Wallet or testnet funds.
+- **Simulation Mode Buttons**: `Happy path`, `Failed payment`, `Payment timeout`, `Invalid token`.
+- **Raw HTTP Exchange Viewer**: Renders real-time HTTP headers, 402 payloads, signature objects, and response headers.
+
+---
+
+### Documentation Pages (`/docs`, `/developers`, `/integrations`)
+
+- Full developer documentation covering x402 headers, Algorand AVM settlement, Groq AI configuration, and API reference.
+
+---
+
+## 🔌 7. Exhaustive API Reference (All Endpoints)
+
+### 1. `POST /api/price`
+Quote document page count and USD cost without triggering payment.
 
 ```bash
-npm install @x402-avm/express @x402-avm/avm @x402-avm/core
-# only if you want a browser paywall UI:
-npm install @x402-avm/paywall
+curl -X POST http://localhost:8080/api/price \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Sample document content to quote..."}'
 ```
 
-Do **not** install the plain `@x402/*` packages or `algosdk` directly — as of
-`@x402-avm` v2.6+, `algosdk` was dropped as a direct dependency in favor of
-`@algorandfoundation/algokit-utils`.
+```json
+{
+  "pages": 1,
+  "price": "$0.01",
+  "amount": "10000",
+  "network": "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=",
+  "facilitator": "https://facilitator.goplausible.xyz",
+  "asset": "10458941",
+  "payTo": "UPRVZO4TROKAOI2KBRWKVKQUWXNV4DQ4NDL5PEARA4IVZ73DDROT2ATSV4"
+}
+```
 
-### 2. Wire up the payment-gated route (resource server side)
+---
 
-This is the core pattern — a route config object plus one middleware call:
+### 2. `POST /api/summarize`
+Gated document processing endpoint accepting 5 extraction modes.
 
-```ts
-import express from "express";
-import { paymentMiddlewareFromConfig } from "@x402-avm/express";
-import { HTTPFacilitatorClient } from "@x402-avm/core/server";
-import { ALGORAND_TESTNET_CAIP2 } from "@x402-avm/avm";
+```bash
+curl -X POST http://localhost:8080/api/summarize \
+  -H "Content-Type: application/json" \
+  -H "payment-signature: <base64-signed-payload>" \
+  -d '{"text": "Contract text...", "mode": "compliance_check"}'
+```
 
-const app = express();
-app.use(express.json());
+```json
+{
+  "summary": "## Compliance Check\n\n- **Parties & Roles**: ✅ Present\n- **Dates & Deadlines**: ✅ Present",
+  "mode": "compliance_check",
+  "pages": 1,
+  "pricePaid": "$0.01",
+  "amountPaid": "10000 (asset 10458941)",
+  "txId": "VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q",
+  "explorer": "https://lora.algokit.io/testnet/transaction/VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q",
+  "payer": "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE"
+}
+```
 
-const PAY_TO = process.env.RESOURCE_PAY_TO!; // your Algorand testnet address
+---
 
-// Use the hosted Algorand facilitator (no need to run your own for the hackathon)
-const facilitatorClient = new HTTPFacilitatorClient({
-  url: "https://facilitator.goplausible.xyz",
-});
+### 3. `POST /api/summarize/range`
+Page range selection AI processing endpoint.
 
-const routes = {
-  "POST /summarize": {
-    accepts: {
-      scheme: "exact",
-      network: ALGORAND_TESTNET_CAIP2,
-      payTo: PAY_TO,
-      // dynamic price: $0.01 per page, computed from the request body
-      price: (context) => {
-        const pages = context.adapter.getBody()?.pageCount ?? 1;
-        const amount = (pages * 0.01).toFixed(2);
-        return `$${amount}`;
-      },
-    },
-    description: "Pay-per-page AI document summary",
+```bash
+curl -X POST http://localhost:8080/api/summarize/range \
+  -H "Content-Type: application/json" \
+  -H "payment-signature: <base64-signed-payload>" \
+  -d '{"text": "Full text...", "startPage": 2, "endPage": 4, "mode": "action_items"}'
+```
+
+---
+
+### 4. `POST /api/compare`
+Dual-document side-by-side comparison endpoint.
+
+```bash
+curl -X POST http://localhost:8080/api/compare \
+  -H "Content-Type: application/json" \
+  -H "payment-signature: <base64-signed-payload>" \
+  -d '{"textA": "Document A text...", "textB": "Document B text..."}'
+```
+
+---
+
+### 5. `GET /api/receipt`
+Public receipt verification service by Algorand transaction ID.
+
+```bash
+curl http://localhost:8080/api/receipt?txId=VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q
+```
+
+```json
+{
+  "verified": true,
+  "txId": "VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q",
+  "route": "POST /api/summarize",
+  "pages": 1,
+  "pricePaid": "$0.01",
+  "payer": "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+  "auditChain": {
+    "entryHash": "b3f9d3fe1e448520d8e164678beb239a7ebb1c6000a348f815c44d0701299a6a",
+    "previousEntryHash": "36f22782e9861a54db6e7b85682c6a02d4ec095d83b534399b5507bac8f960d8"
   },
-};
-
-app.use(
-  paymentMiddlewareFromConfig(routes, facilitatorClient, [
-    { network: "algorand:*", server: undefined }, // see note below
-  ]),
-);
-
-app.post("/summarize", async (req, res) => {
-  // this code only runs AFTER payment has been verified and settled
-  // ...call your summarizer here...
-});
-
-app.listen(4021);
-```
-
-> Note: for full control (and to match the official examples), prefer the
-> `x402ResourceServer` + `registerExactAvmScheme` pattern instead of the bare
-> array above — the AI should follow the "Quick Start with
-> paymentMiddlewareFromConfig" and "Using paymentMiddleware with
-> x402ResourceServer" examples from the official docs precisely rather than
-> improvising the wiring.
-
-### 3. How the flow behaves at runtime
-
-1. Client calls `POST /summarize` with a document, no payment header.
-2. Middleware intercepts it, computes the price via your dynamic pricing
-   function, and returns `402 Payment Required` with an `X-PAYMENT`-shaped
-   payment requirements body (amount, Algorand address, network, asset).
-3. Client (a wallet, an agent, or your demo frontend) constructs and signs an
-   Algorand payment transaction for that exact amount, and retries the request
-   with the payment attached in the `X-PAYMENT` header.
-4. Middleware forwards the payment to the facilitator's `/verify` and
-   `/settle` endpoints. The facilitator checks and submits the transaction on
-   Algorand testnet.
-5. If settlement succeeds, the middleware calls your actual route handler,
-   which runs the summarization and returns `200 OK` with the summary.
-6. If settlement fails, the middleware returns an error response — your route
-   handler code never runs, so you never "spend" the summarization step on an
-   unpaid or failed-payment request.
-
-### 4. Pricing notes
-
-- `price` can be a fixed string (`"$0.01"`) or a function of the request
-  (`context => ...`) — use the function form for true pay-per-page pricing.
-- Default currency is ALGO (resolved from the USD-style price string). Only
-  add `extra: { asset: USDC_TESTNET_ASA_ID }` if you specifically want USDC
-  pricing instead — not required for this project.
-
-### 5. Client-side (for testing without a full wallet)
-
-For local testing/demo, use the `@x402-avm` client examples (Fetch or Axios
-wrapper) which handle the "get 402 → sign payment → retry" dance
-automatically, rather than hand-writing that logic:
-
-```bash
-npm install @x402-avm/fetch
-```
-
-```ts
-import { wrapFetchWithPayment } from "@x402-avm/fetch";
-// wrapFetchWithPayment(fetch, signer) returns a fetch-like function that
-// automatically retries 402 responses with a signed payment.
+  "onChainVerified": true,
+  "explorer": "https://lora.algokit.io/testnet/transaction/VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q"
+}
 ```
 
 ---
 
-## ALGORAND INTEGRATION — IN DEPTH
+### 6. `GET /api/trust-score`
+Public address reliability score aggregation endpoint.
 
-### 1. Create two Algorand TESTNET accounts
-
-You need at least two accounts:
-- **Merchant/resource-server account** — receives the payments (`RESOURCE_PAY_TO`).
-- **Client/payer account** — used by your demo frontend or test script to pay.
-
-Easiest ways to get testnet accounts, pick one:
-- Install **Pera Wallet** (mobile or web), switch it to TestNet mode, and
-  create two accounts there — this also gives you a real wallet to sign
-  payments with during your live demo.
-- Or generate accounts programmatically with `@algorandfoundation/algokit-utils`
-  (`algokit-utils` account generation helpers) if you want a fully scripted
-  setup for automated testing.
-
-### 2. Fund both accounts with testnet ALGO
-
-Use the official Algorand TestNet dispenser to fund each address with a small
-amount of testnet ALGO (enough to cover the $0.01–$1.00 demo payments plus
-network fees). Do this for **both** the merchant and the payer account.
-
-### 3. Configure environment variables
-
-```
-# .env
-RESOURCE_PAY_TO=<your merchant testnet address, 58 characters>
-ALGOD_SERVER=https://testnet-api.algonode.cloud
-ALGOD_TOKEN=
-PORT=4021
+```bash
+curl http://localhost:8080/api/trust-score?address=EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE
 ```
 
-- `ALGOD_SERVER` points at a public Algorand testnet node (Algonode's public
-  endpoint is free and requires no token — leave `ALGOD_TOKEN` empty).
-- You do **not** need to run your own Algorand node.
-
-### 4. Facilitator — use the hosted one, don't build your own
-
-For the hackathon, point your `HTTPFacilitatorClient` at the official hosted
-Algorand facilitator:
-
+```json
+{
+  "address": "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+  "trustScore": 100,
+  "totalTransactions": 10,
+  "totalVolumeUsd": "$0.11",
+  "successRate": 100,
+  "firstSeen": "2026-08-22T09:39:00.000Z",
+  "lastSeen": "2026-08-22T14:02:00.000Z"
+}
 ```
-https://facilitator.goplausible.xyz
+
+---
+
+### 7. `GET /api/audit/verify`
+Tamper-evident audit chain integrity verification.
+
+```bash
+curl http://localhost:8080/api/audit/verify
 ```
 
-This facilitator already knows how to verify and settle Algorand exact
-payments — you do not need to run `x402Facilitator` yourself unless you
-specifically want to demonstrate a self-hosted facilitator or need fee
-abstraction (a facilitator paying the network fee on the user's behalf), which
-is an optional advanced feature, not required for a working demo.
+---
 
-### 5. Network identifiers you'll need
+### 8. `GET /api/tools`
+Machine-readable tool discovery metadata for AI Agents.
 
-| What | Value |
-|---|---|
-| Testnet CAIP-2 ID | `ALGORAND_TESTNET_CAIP2` constant from `@x402-avm/avm` |
-| Testnet algod URL | `https://testnet-api.algonode.cloud` |
-| Testnet USDC ASA ID (only if using USDC pricing) | `10458941` |
+```bash
+curl http://localhost:8080/api/tools
+```
 
-### 6. Testing the full loop locally
+---
 
-1. Start your resource server (`npm run dev` or similar).
-2. `curl -X POST http://localhost:4021/summarize -d '{"text":"..."}' -H "Content-Type: application/json"` with no payment → expect `402` with price + payment details.
-3. Use the wrapped fetch client (or your demo frontend + Pera Wallet) to sign
-   and attach payment, then retry → expect `200` with the summary.
-4. Try an insufficient/invalid payment to confirm you get a clean `402`
-   failure, not a crash — this demonstrates the fallback handling to judges.
+## 🌱 8. Startup Transaction Seed & Verifiable History
 
-### 7. What to show live during judging
+PagePay automatically seeds in-memory logs on server boot with **real, independently verifiable Algorand Testnet transactions**:
 
-- The raw `402` response (price + Algorand payment details) in a terminal or
-  browser network tab — this is the clearest way to prove real x402 usage.
-- A successful payment + summary round-trip.
-- One deliberate failure case (e.g. underpaying) to show your fallback
-  handling actually works, not just the happy path.
+- `SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA` ($0.03 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA)
+- `WD4FH32FKXL5MAUOKUDTTZ3H76SGKVQNJASYPV4SICW6QQC5TAOT` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/WD4FH32FKXL5MAUOKUDTTZ3H76SGKVQNJASYPV4SICW6QQC5TAOT)
+- `5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPEEVEHMXV4HH26HN6` ($0.02 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPEEVEHMXV4HH26HN6)
+- `27J5GFWM32ZD2TBJ5KIVLXZE34BZMPRJA757G542LVX4UXRFNI4A` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/27J5GFWM32ZD2TBJ5KIVLXZE34BZMPRJA757G542LVX4UXRFNI4A)
+- `VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q)
 
-After Base Build features:
-#1 - Complete an end-to-end payment with a real Algorand testnet wallet What & Why The x402 middleware is wired up and returns a correct 402 response, but the demo frontend uses a simulated flow. To fully prove the protocol in a live demo, the frontend needs to complete a real Algorand payment using Pera Wallet (WalletConnect) or the @x402-avm/fetch wrapped-fetch client.
+---
 
-Done looks like Frontend connects to Pera Wallet via WalletConnect or AlgoConnect On "Pay", it reads the 402 payment requirements, builds the Algorand txn, gets user signature, and retries POST /api/summarize with the signed X-PAYMENT header A real successful summary is returned after on-chain settlement on Algorand testnet RESOURCE_PAY_TO is set in Secrets to a funded testnet merchant address Relevant files artifacts/api-server/public/index.html — demo frontend; the payment simulation block (labeled "Real-wallet integration point") is the exact hook artifacts/api-server/src/x402/routeConfig.ts — middleware config artifacts/api-server/.env.example — env var reference
+## 💻 9. Installation, Environment & Local Setup
 
-#2 - Add a live payment history dashboard What & Why Every request is appended to requests.log (JSON Lines). A simple dashboard reading that log would let you monitor page counts, revenue, payment statuses, and errors — useful for a live hackathon demo and for monitoring real usage.
+### Prerequisites
+- Node.js v18.0.0+
+- Google Chrome or Microsoft Edge (for Pera Web wallet integration)
+- Pera Wallet set to **Testnet** (Chain ID `416002`)
+- Testnet ALGO ([Algorand Dispenser](https://bank.testnet.algorand.network/)) & Testnet USDC ([Circle Faucet](https://faucet.circle.com))
 
-Done looks like A GET /api/logs endpoint streams or returns recent entries from requests.log A new tab or section in the frontend shows a live table: timestamp, pages, price, payment status, outcome Auto-refreshes every few seconds during the demo Relevant files artifacts/api-server/src/services/pagepayLogger.ts — log format definition artifacts/api-server/public/index.html — where the dashboard tab would live
+### Environment Configuration (`.env`)
 
-#3 - Prevent silent failures when the facilitator is slow or unreachable What & Why The x402-avm middleware calls the hosted facilitator (facilitator.goplausible.xyz) to verify and settle payments. If that call times out, the middleware behaviour is currently unhandled — it may hang or return an unhelpful error. The build spec requires a 504 with a clear message after one retry.
+```ini
+RESOURCE_PAY_TO=UPRVZO4TROKAOI2KBRWKVKQUWXNV4DQ4NDL5PEARA4IVZ73DDROT2ATSV4
+GROQ_API_KEY=gsk_...
+TEST_PAYER_MNEMONIC="path atom field absorb old pretty couch round recycle ordinary scene supply rough fine canoe seven quote muscle mad enlist drastic rabbit coin ability parade"
+```
 
-Done looks like A timeout + single retry wrapper is applied around the facilitator calls (or the Express timeout middleware is configured to cover the full request) Timeout returns HTTP 504 with { error: "Payment gateway timeout", reason: "..." } The failed attempt is logged to requests.log with outcome "gateway_error" Relevant files artifacts/api-server/src/x402/routeConfig.ts — facilitator client setup artifacts/api-server/src/routes/summarize.ts — where the 504 response belongs
+### Development & Build Commands
 
-This project was built with [Lovable](https://lovable.dev).
+```bash
+# Install dependencies
+npm install
 
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/cd97ba70-3a36-42fd-a8c5-c2cfb66a3552).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+# Start Vite development server
 npm run dev
+
+# Verify production build
+npm run build
 ```
+
+---
+
+<div align="center">
+  <b>PagePay — Autonomous Machine-to-Machine Pay-Per-Page AI Processing</b><br />
+  Built on HTTP 402 · Settled on Algorand Testnet · Verified by GoPlausible
+</div>

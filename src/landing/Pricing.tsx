@@ -1,54 +1,51 @@
 import { Link } from "@tanstack/react-router";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Container } from "@/components/marketing/Container";
-import { SectionHeading } from "@/components/marketing/SectionHeading";
 
 const TIERS = [
   {
-    name: "Developer",
+    name: "Autonomous Agent",
     price: "$0.01",
     unit: "per page",
-    description: "Testnet demo pricing for the live summarization flow.",
+    description: "Algorand Testnet USDC exact-metered pricing for AI Agents.",
     features: [
-      "HTTP 402 quotes",
-      "Testnet USDC settlement",
-      "Pera Wallet signing",
-      "Raw protocol proof in UI",
+      "HTTP 402 exact scheme quotes",
+      "5 Modes (Summary, Action Items, Key Risks, Compliance, Checklist)",
+      "Agent Spend Policy Guard ($/request & $/session)",
+      "Tamper-Evident SHA-256 Audit Trail",
     ],
-    cta: "Try live demo",
+    cta: "Launch Live Demo",
     to: "/demo" as const,
     highlighted: true,
   },
   {
-    name: "Integrator",
-    price: "Custom",
-    unit: "volume",
-    description: "Wire x402 into your own APIs with the same facilitator and scheme.",
+    name: "Multi-Doc Compare",
+    price: "$0.01",
+    unit: "per combined page",
+    description: "Side-by-side AI document comparison with single atomic payment.",
     features: [
-      "Exact-AVM requirements",
-      "Hosted facilitator",
-      "Dynamic per-request pricing",
-      "Facilitator verify/settle hooks",
+      "Combined page calculation",
+      "Structural Document A vs B analysis",
+      "Single 402 payment transaction",
+      "Independent receipt verification",
     ],
-    cta: "Read developers docs",
-    to: "/developers" as const,
+    cta: "Compare Documents",
+    to: "/demo" as const,
     highlighted: false,
   },
   {
-    name: "Enterprise",
-    price: "Talk",
-    unit: "to us",
-    description: "Self-hosted facilitators, mainnet readiness, and SLA-shaped settlement.",
+    name: "Developer API",
+    price: "$0.00",
+    unit: "public read",
+    description: "Public read-only endpoints for receipts, trust scores, and audit verification.",
     features: [
-      "Custom pay-to routes",
-      "Multi-asset support",
-      "Observability & logging",
-      "Dedicated support",
+      "GET /api/receipt (Receipt Verification)",
+      "GET /api/trust-score (Address Reliability)",
+      "GET /api/audit/verify (SHA-256 Chain Check)",
+      "GET /api/tools (Agent Discovery)",
     ],
-    cta: "View integrations",
-    to: "/integrations" as const,
+    cta: "Read API Docs",
+    to: "/docs" as const,
     highlighted: false,
   },
 ] as const;
@@ -62,47 +59,52 @@ const FACTS = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="border-b border-border py-20 md:py-24">
-      <Container>
-        <SectionHeading
-          eyebrow="Pricing"
-          title="Simple metering, no subscriptions"
-          description="PagePay charges per parsed page. Quotes are computed server-side so the UI price always matches the 402 requirement."
-        />
+    <section id="pricing" className="border-b border-border py-20 md:py-24 font-mono">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <span className="text-xs uppercase tracking-wider text-primary">SIMPLE METERING</span>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
+            Machine Pricing &amp; Capabilities
+          </h2>
+          <p className="mt-3 max-w-2xl mx-auto text-sm leading-relaxed text-muted-foreground">
+            PagePay charges strictly per parsed page. No monthly subscriptions, no lock-in.
+          </p>
+        </div>
+
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
           {TIERS.map((tier) => (
             <div
               key={tier.name}
-              className={`flex flex-col rounded-2xl border p-8 ${
+              className={`flex flex-col rounded-2xl border p-6 ${
                 tier.highlighted
-                  ? "border-accent-green/40 bg-card ring-1 ring-accent-green/20"
+                  ? "border-primary/50 bg-card ring-1 ring-primary/20"
                   : "border-border bg-background"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-section-heading text-foreground">{tier.name}</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">{tier.name}</h3>
                 {tier.highlighted && (
-                  <Badge className="rounded-full bg-accent-green/15 text-accent-green">
-                    Live
+                  <Badge className="bg-primary/20 text-primary border border-primary/40 text-[10px]">
+                    Live Flow
                   </Badge>
                 )}
               </div>
               <p className="mt-4">
-                <span className="font-display text-4xl text-foreground">{tier.price}</span>
-                <span className="ml-2 text-sm text-muted-foreground">{tier.unit}</span>
+                <span className="text-3xl font-bold text-foreground">{tier.price}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{tier.unit}</span>
               </p>
-              <p className="mt-3 text-sm text-muted-foreground">{tier.description}</p>
-              <ul className="mt-6 flex-1 space-y-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">{tier.description}</p>
+              <ul className="mt-6 flex-1 space-y-2 text-xs text-muted-foreground">
                 {tier.features.map((f) => (
                   <li key={f} className="flex items-start gap-2">
-                    <span className="text-accent-green">✓</span>
+                    <span className="text-primary font-bold">✓</span>
                     {f}
                   </li>
                 ))}
               </ul>
               <Button
-                className={`mt-8 rounded-full ${tier.highlighted ? "bg-primary text-primary-foreground" : ""}`}
-                variant={tier.highlighted ? "default" : "secondary"}
+                className={`mt-8 ${tier.highlighted ? "bg-primary text-primary-foreground font-semibold" : ""}`}
+                variant={tier.highlighted ? "default" : "outline"}
                 asChild
               >
                 <Link to={tier.to}>{tier.cta}</Link>
@@ -110,17 +112,18 @@ export function Pricing() {
             </div>
           ))}
         </div>
+
         <div className="mt-12 grid gap-4 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2 lg:grid-cols-4">
           {FACTS.map((fact) => (
             <div key={fact.label}>
-              <p className="font-mono text-[10px] uppercase tracking-widest text-subtle">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 {fact.label}
               </p>
-              <p className="mt-1 font-mono text-sm text-foreground">{fact.value}</p>
+              <p className="mt-1 text-xs text-foreground font-bold">{fact.value}</p>
             </div>
           ))}
         </div>
-      </Container>
+      </div>
     </section>
   );
 }

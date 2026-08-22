@@ -1,9 +1,9 @@
 /**
  * LiveDemo component — main interactive demo interface for PagePay.
  *
- * Provides single document summarization (with 4 extraction modes: Summary, Action Items,
- * Key Risks, Compliance Check), page range selection, dual-document comparison, and
- * live agent spend policy enforcement.
+ * Provides single document summarization (with 5 extraction modes: Summary, Action Items,
+ * Key Risks, Compliance Check, Checklist), page range selection, dual-document comparison,
+ * autonomous agent policy enforcement ("Run as Agent"), and automatic post-settlement audit trail verification.
  */
 import { useMemo, useState } from "react";
 import {
@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Zap,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -100,42 +101,18 @@ type PaymentPhase =
   | "generating_summary"
   | "complete";
 
-function PhaseStep({
-  stepNumber,
-  label,
-  active,
-  completed,
+function Card({
+  title,
+  children,
+  className,
 }: {
-  stepNumber: number;
-  label: string;
-  active: boolean;
-  completed: boolean;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center gap-2 font-mono text-xs">
-      <div
-        className={cn(
-          "flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all",
-          completed
-            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-            : active
-            ? "bg-primary/20 text-primary border border-primary/50 animate-pulse"
-            : "bg-muted text-muted-foreground border border-border/50",
-        )}
-      >
-        {completed ? "✓" : stepNumber}
-      </div>
-      <span className={cn(completed ? "text-foreground font-medium" : active ? "text-primary font-semibold" : "text-muted-foreground")}>
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function Card({ title, walkthrough, children, className }: { title: string; walkthrough?: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("rounded-2xl border border-border/70 bg-card p-6 shadow-sm", className)}>
-      <h3 className="mb-4 font-mono text-sm font-semibold uppercase tracking-wider text-card-foreground">
+    <div className={cn("rounded-xl border border-border bg-card p-5 transition-all shadow-sm", className)}>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono mb-4">
         {title}
       </h3>
       {children}
@@ -143,7 +120,7 @@ function Card({ title, walkthrough, children, className }: { title: string; walk
   );
 }
 
-export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
+export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: () => void }) {
   const [activeTab, setActiveTab] = useState<"single" | "compare">("single");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -154,6 +131,10 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
   const [phase, setPhase] = useState<PaymentPhase | null>(null);
   const [exchange, setExchange] = useState<PaidRequestResult | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
+
+  // Auto-audit trail triggers
+  const [settledTxId, setSettledTxId] = useState<string | null>(null);
+  const [settledAddress, setSettledAddress] = useState<string | null>(null);
 
   const [policy, setPolicy] = useState<AgentSpendPolicy>(DEFAULT_AGENT_POLICY);
   const [showPolicyConfig, setShowPolicyConfig] = useState(false);
@@ -209,7 +190,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
     }
   }
 
-  async function handlePayAndSummarize() {
+  async function handleExecuteFlow(isAgentMode: boolean) {
     if (!wallet.signer || !wallet.address) {
       setError({
         message: "Connect your Algorand Pera Wallet first to sign the x402 USDC payment.",
@@ -247,7 +228,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
       const result = await runAgentWithPolicy(
         "/api/summarize",
         { method: "POST", headers, body },
-        wallet.signer!,
+        wallet.signer,
         policy,
         SESSION_TRACKER,
         mode,
@@ -257,7 +238,19 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
 
       if (result.allowed && result.paidResult?.ok) {
         setPhase("complete");
-        toast.success("Document summarized! USDC payment settled on Algorand testnet.");
+        const resData = result.paidResult.result as SummaryResult | null;
+        if (resData?.txId) {
+          setSettledTxId(resData.txId);
+        }
+        if (resData?.payer || wallet.address) {
+          setSettledAddress(resData?.payer ?? wallet.address);
+        }
+
+        toast.success(
+          isAgentMode
+            ? "🤖 Agent Policy Guard approved & executed! Summary generated + auto audit trail verified."
+            : "Document summarized! USDC payment settled on Algorand testnet."
+        );
       } else {
         setPhase(null);
         if (!result.allowed) {
@@ -279,14 +272,14 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
   }
 
   return (
-    <section id="demo" className="relative border-t border-border/40 py-20 bg-background/50">
-      <div className="container max-w-6xl">
+    <section id="demo" className="relative border-t border-border/40 py-16 md:py-20 bg-background/50">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
           <h2 className="text-2xl font-bold font-mono tracking-tight sm:text-3xl text-foreground">
             LIVE DEMO &amp; INTERACTIVE FLOW
           </h2>
           <p className="mt-2 text-sm text-muted-foreground font-mono">
-            Select an extraction mode, inspect page-based quotes, and execute pay-per-page AI processing.
+            Select an extraction mode, inspect page-based quotes, execute pay-per-page AI processing, or run autonomously as an Agent.
           </p>
         </div>
 
@@ -459,23 +452,33 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
 
                 {/* Primary Action Buttons */}
                 <div className="flex flex-col gap-2 pt-2 border-t border-border/40">
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={quoting || running || (!file && !text.trim())}
                       onClick={() => void handleGetQuote()}
-                      className="flex-1 text-xs font-mono"
+                      className="text-xs font-mono"
                     >
                       {quoting ? "Quoting…" : "Get Price Quote"}
                     </Button>
                     <Button
                       size="sm"
                       disabled={running || (!file && !text.trim())}
-                      onClick={() => void handlePayAndSummarize()}
-                      className="flex-1 text-xs font-mono font-semibold"
+                      onClick={() => void handleExecuteFlow(false)}
+                      className="text-xs font-mono font-semibold"
                     >
                       {running ? "Processing…" : "Pay & Execute"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={running || (!file && !text.trim())}
+                      onClick={() => void handleExecuteFlow(true)}
+                      className="text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40 gap-1.5"
+                    >
+                      <Bot className="size-3.5" />
+                      <span>{running ? "Agent Running…" : "🤖 Run as Agent"}</span>
                     </Button>
                   </div>
 
@@ -583,13 +586,13 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border bg-muted/10 p-8 text-center font-mono text-xs text-muted-foreground">
-                    Select an extraction mode and click “Pay &amp; Execute” to trigger x402 payment settlement and output.
+                    Select an extraction mode and click “Pay &amp; Execute” or “🤖 Run as Agent” to trigger x402 payment settlement and output.
                   </div>
                 )}
               </Card>
 
               {/* AUDIT TRAIL & RECEIPT VERIFICATION WIDGET */}
-              <AuditTrailWidget />
+              <AuditTrailWidget autoTxId={settledTxId} autoAddress={settledAddress} />
             </div>
           </div>
         )}

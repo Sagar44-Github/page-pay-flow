@@ -1,8 +1,10 @@
 /**
  * AuditTrailWidget — Frontend component for live cryptographic log verification,
  * Receipt Verification Service, and Agent Trust Score lookup.
+ *
+ * Supports automatic verification when txId / address are passed post-settlement.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShieldCheck, ShieldAlert, RefreshCw, Search, CheckCircle2, XCircle, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +54,12 @@ interface TrustScoreResult {
   reason?: string;
 }
 
-export function AuditTrailWidget() {
+export interface AuditTrailWidgetProps {
+  autoTxId?: string | null;
+  autoAddress?: string | null;
+}
+
+export function AuditTrailWidget({ autoTxId, autoAddress }: AuditTrailWidgetProps) {
   const [loading, setLoading] = useState(false);
   const [audit, setAudit] = useState<AuditResult | null>(null);
 
@@ -80,18 +87,18 @@ export function AuditTrailWidget() {
     }
   }
 
-  async function handleVerifyReceipt() {
-    if (!searchTxId.trim()) return;
+  async function verifyReceiptForTx(txIdToVerify: string) {
+    if (!txIdToVerify.trim()) return;
     setVerifyingReceipt(true);
     setReceiptResult(null);
     try {
-      const res = await fetch(`/api/receipt?txId=${encodeURIComponent(searchTxId.trim())}`);
+      const res = await fetch(`/api/receipt?txId=${encodeURIComponent(txIdToVerify.trim())}`);
       const data = (await res.json()) as ReceiptVerification;
       setReceiptResult(data);
     } catch (err) {
       setReceiptResult({
         verified: false,
-        txId: searchTxId.trim(),
+        txId: txIdToVerify.trim(),
         timestamp: "",
         route: "",
         pages: 0,
@@ -107,17 +114,17 @@ export function AuditTrailWidget() {
     }
   }
 
-  async function handleCheckTrustScore() {
-    if (!searchAddress.trim()) return;
+  async function checkTrustScoreForAddress(addressToCheck: string) {
+    if (!addressToCheck.trim()) return;
     setCheckingScore(true);
     setTrustScoreResult(null);
     try {
-      const res = await fetch(`/api/trust-score?address=${encodeURIComponent(searchAddress.trim())}`);
+      const res = await fetch(`/api/trust-score?address=${encodeURIComponent(addressToCheck.trim())}`);
       const data = (await res.json()) as TrustScoreResult;
       setTrustScoreResult(data);
     } catch (err) {
       setTrustScoreResult({
-        address: searchAddress.trim(),
+        address: addressToCheck.trim(),
         trustScore: 0,
         totalTransactions: 0,
         totalVolumeUsd: "$0.00",
@@ -132,8 +139,24 @@ export function AuditTrailWidget() {
     }
   }
 
+  // Auto-trigger when new settled txId or address is passed
+  useEffect(() => {
+    if (autoTxId) {
+      setSearchTxId(autoTxId);
+      void verifyReceiptForTx(autoTxId);
+      void handleVerify(); // Auto re-verify tamper audit chain
+    }
+  }, [autoTxId]);
+
+  useEffect(() => {
+    if (autoAddress) {
+      setSearchAddress(autoAddress);
+      void checkTrustScoreForAddress(autoAddress);
+    }
+  }, [autoAddress]);
+
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-5 font-mono text-xs">
+    <div className="rounded-xl border border-border bg-card p-5 space-y-5 font-mono text-xs shadow-sm">
       {/* ── 1. TAMPER-EVIDENT AUDIT TRAIL ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -213,7 +236,7 @@ export function AuditTrailWidget() {
             size="sm"
             disabled={verifyingReceipt || !searchTxId.trim()}
             className="h-8 text-xs font-mono font-semibold"
-            onClick={() => void handleVerifyReceipt()}
+            onClick={() => void verifyReceiptForTx(searchTxId)}
           >
             {verifyingReceipt ? "Verifying…" : "Verify Receipt"}
           </Button>
@@ -293,7 +316,7 @@ export function AuditTrailWidget() {
             size="sm"
             disabled={checkingScore || !searchAddress.trim()}
             className="h-8 text-xs font-mono font-semibold"
-            onClick={() => void handleCheckTrustScore()}
+            onClick={() => void checkTrustScoreForAddress(searchAddress)}
           >
             {checkingScore ? "Calculating…" : "Check Score"}
           </Button>

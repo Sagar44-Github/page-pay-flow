@@ -43,52 +43,61 @@ export async function groqChat(options: {
       ? options.model
       : GROQ_DEFAULT_MODEL;
 
-  const startedAt = Date.now();
-  let response: Response;
-  try {
-    response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: options.messages,
-        temperature: options.temperature ?? 0.4,
-        max_tokens: options.maxTokens ?? 700,
-      }),
-    });
-  } catch (error) {
-    throw new GroqError(
-      `Groq request failed: ${error instanceof Error ? error.message : String(error)}`,
-      504,
-    );
+  const maxRetries = 2;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const startedAt = Date.now();
+    const temperature = (options.temperature ?? 0.4) + attempt * 0.2;
+    let response: Response;
+    try {
+      response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: options.messages,
+          temperature,
+          max_tokens: options.maxTokens ?? 700,
+        }),
+      });
+    } catch (error) {
+      throw new GroqError(
+        `Groq request failed: ${error instanceof Error ? error.message : String(error)}`,
+        504,
+      );
+    }
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new GroqError(`Groq returned ${response.status}: ${text.slice(0, 400)}`, response.status);
+    }
+
+    let parsed: {
+      choices?: { message?: { content?: string } }[];
+      usage?: GroqCompletion["usage"];
+      model?: string;
+    };
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new GroqError("Groq returned a non-JSON response.");
+    }
+
+    const content = parsed.choices?.[0]?.message?.content?.trim();
+    if (content) {
+      return {
+        content,
+        model: parsed.model ?? model,
+        ...(parsed.usage ? { usage: parsed.usage } : {}),
+        latencyMs: Date.now() - startedAt,
+      };
+    }
+
+    // Empty completion — retry with higher temperature
+    console.warn(`[groq] Empty completion on attempt ${attempt + 1}, retrying...`);
   }
 
-  const text = await response.text();
-  if (!response.ok) {
-    throw new GroqError(`Groq returned ${response.status}: ${text.slice(0, 400)}`, response.status);
-  }
-
-  let parsed: {
-    choices?: { message?: { content?: string } }[];
-    usage?: GroqCompletion["usage"];
-    model?: string;
-  };
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new GroqError("Groq returned a non-JSON response.");
-  }
-
-  const content = parsed.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new GroqError("Groq returned an empty completion.");
-
-  return {
-    content,
-    model: parsed.model ?? model,
-    ...(parsed.usage ? { usage: parsed.usage } : {}),
-    latencyMs: Date.now() - startedAt,
-  };
+  throw new GroqError("Groq returned an empty completion after retries.");
 }
