@@ -1,12 +1,9 @@
 /**
- * AuditTrailWidget — Frontend component for live cryptographic log verification
- * and independent Receipt Verification Service.
- *
- * Displays total entries, chain status (✅ Verified / ❌ Broken), genesis hash,
- * a "Re-verify chain" button, and a dedicated "Verify a Receipt" search tool.
+ * AuditTrailWidget — Frontend component for live cryptographic log verification,
+ * Receipt Verification Service, and Agent Trust Score lookup.
  */
 import { useState } from "react";
-import { ShieldCheck, ShieldAlert, RefreshCw, Search, CheckCircle2, XCircle } from "lucide-react";
+import { ShieldCheck, ShieldAlert, RefreshCw, Search, CheckCircle2, XCircle, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -43,14 +40,31 @@ interface ReceiptVerification {
   reason?: string;
 }
 
+interface TrustScoreResult {
+  address: string;
+  trustScore: number;
+  totalTransactions: number;
+  totalVolumeUsd: string;
+  successRate: number | null;
+  firstSeen: string | null;
+  lastSeen: string | null;
+  error?: string;
+  reason?: string;
+}
+
 export function AuditTrailWidget() {
   const [loading, setLoading] = useState(false);
   const [audit, setAudit] = useState<AuditResult | null>(null);
 
-  // Receipt verification search state
+  // Receipt verification state
   const [searchTxId, setSearchTxId] = useState("");
   const [verifyingReceipt, setVerifyingReceipt] = useState(false);
   const [receiptResult, setReceiptResult] = useState<ReceiptVerification | null>(null);
+
+  // Trust Score state
+  const [searchAddress, setSearchAddress] = useState("");
+  const [checkingScore, setCheckingScore] = useState(false);
+  const [trustScoreResult, setTrustScoreResult] = useState<TrustScoreResult | null>(null);
 
   async function handleVerify() {
     setLoading(true);
@@ -90,6 +104,31 @@ export function AuditTrailWidget() {
       });
     } finally {
       setVerifyingReceipt(false);
+    }
+  }
+
+  async function handleCheckTrustScore() {
+    if (!searchAddress.trim()) return;
+    setCheckingScore(true);
+    setTrustScoreResult(null);
+    try {
+      const res = await fetch(`/api/trust-score?address=${encodeURIComponent(searchAddress.trim())}`);
+      const data = (await res.json()) as TrustScoreResult;
+      setTrustScoreResult(data);
+    } catch (err) {
+      setTrustScoreResult({
+        address: searchAddress.trim(),
+        trustScore: 0,
+        totalTransactions: 0,
+        totalVolumeUsd: "$0.00",
+        successRate: null,
+        firstSeen: null,
+        lastSeen: null,
+        error: "Lookup failed",
+        reason: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setCheckingScore(false);
     }
   }
 
@@ -218,11 +257,6 @@ export function AuditTrailWidget() {
                       <div className="truncate">Entry Hash: {receiptResult.auditChain.entryHash}</div>
                     </div>
                   )}
-                  {receiptResult.onChainDetails?.reason && (
-                    <div className="text-amber-400 text-[10px]">
-                      On-Chain Notice: {receiptResult.onChainDetails.reason}
-                    </div>
-                  )}
                 </div>
               </>
             ) : (
@@ -232,6 +266,78 @@ export function AuditTrailWidget() {
                   {receiptResult.error}: {receiptResult.reason ?? "Receipt not found in server log."}
                 </span>
               </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. AGENT TRUST SCORE LOOKUP ── */}
+      <div className="pt-4 border-t border-border/60 space-y-3">
+        <span className="flex items-center gap-2 font-semibold text-foreground">
+          <Award className="size-4 text-primary" />
+          <span>AGENT TRUST SCORE LOOKUP</span>
+        </span>
+
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Check any Algorand address reliability score (0-100) computed from real PagePay transaction history.
+        </p>
+
+        <div className="flex items-center gap-2">
+          <Input
+            value={searchAddress}
+            placeholder="Paste Algorand Address (e.g. EVEHMX...)"
+            className="font-mono text-xs h-8 flex-1"
+            onChange={(e) => setSearchAddress(e.target.value)}
+          />
+          <Button
+            size="sm"
+            disabled={checkingScore || !searchAddress.trim()}
+            className="h-8 text-xs font-mono font-semibold"
+            onClick={() => void handleCheckTrustScore()}
+          >
+            {checkingScore ? "Calculating…" : "Check Score"}
+          </Button>
+        </div>
+
+        {trustScoreResult && (
+          <div className="rounded-lg border border-border/80 bg-background/60 p-3 space-y-2 text-xs font-mono">
+            {trustScoreResult.error ? (
+              <div className="flex items-center gap-2 text-destructive">
+                <XCircle className="size-4 shrink-0" />
+                <span>{trustScoreResult.error}: {trustScoreResult.reason}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                  <span className="text-muted-foreground">Trust Score Rating:</span>
+                  <span className="text-base font-bold text-primary">
+                    {trustScoreResult.trustScore} / 100
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Settled Transactions:</span>
+                    <span className="text-foreground font-semibold">{trustScoreResult.totalTransactions}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total USD Volume:</span>
+                    <span className="text-foreground font-semibold">{trustScoreResult.totalVolumeUsd}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Settlement Success Rate:</span>
+                    <span className="text-foreground font-semibold">
+                      {trustScoreResult.successRate !== null ? `${trustScoreResult.successRate}%` : "N/A"}
+                    </span>
+                  </div>
+                  {trustScoreResult.firstSeen && (
+                    <div className="flex justify-between pt-1 border-t border-border/40 text-[10px]">
+                      <span>First Activity:</span>
+                      <span>{new Date(trustScoreResult.firstSeen).toLocaleTimeString()}</span>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}

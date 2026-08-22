@@ -26,6 +26,7 @@ import { Route as ApiPriceRouteImport } from './routes/api/price'
 import { Route as ApiReceiptRouteImport } from './routes/api/receipt'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
 import { Route as ApiToolsRouteImport } from './routes/api/tools'
+import { Route as ApiTrustScoreRouteImport } from './routes/api/trust-score'
 import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsAlgorandRouteImport } from './routes/docs/algorand'
@@ -120,6 +121,11 @@ const ApiToolsRoute = ApiToolsRouteImport.update({
   path: '/api/tools',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTrustScoreRoute = ApiTrustScoreRouteImport.update({
+  id: '/api/trust-score',
+  path: '/api/trust-score',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
   id: '/api/x402-demo',
   path: '/api/x402-demo',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/api/receipt': typeof ApiReceiptRoute
   '/api/summarize': typeof ApiSummarizeRouteWithChildren
   '/api/tools': typeof ApiToolsRoute
+  '/api/trust-score': typeof ApiTrustScoreRoute
   '/api/x402-demo': typeof ApiX402DemoRoute
   '/docs/algorand': typeof DocsAlgorandRoute
   '/docs/x402': typeof DocsX402Route
@@ -206,6 +213,7 @@ export interface FileRoutesByTo {
   '/api/receipt': typeof ApiReceiptRoute
   '/api/summarize': typeof ApiSummarizeRouteWithChildren
   '/api/tools': typeof ApiToolsRoute
+  '/api/trust-score': typeof ApiTrustScoreRoute
   '/api/x402-demo': typeof ApiX402DemoRoute
   '/docs/algorand': typeof DocsAlgorandRoute
   '/docs/x402': typeof DocsX402Route
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/api/receipt': typeof ApiReceiptRoute
   '/api/summarize': typeof ApiSummarizeRouteWithChildren
   '/api/tools': typeof ApiToolsRoute
+  '/api/trust-score': typeof ApiTrustScoreRoute
   '/api/x402-demo': typeof ApiX402DemoRoute
   '/docs/algorand': typeof DocsAlgorandRoute
   '/docs/x402': typeof DocsX402Route
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/api/receipt'
     | '/api/summarize'
     | '/api/tools'
+    | '/api/trust-score'
     | '/api/x402-demo'
     | '/docs/algorand'
     | '/docs/x402'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/api/receipt'
     | '/api/summarize'
     | '/api/tools'
+    | '/api/trust-score'
     | '/api/x402-demo'
     | '/docs/algorand'
     | '/docs/x402'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/api/receipt'
     | '/api/summarize'
     | '/api/tools'
+    | '/api/trust-score'
     | '/api/x402-demo'
     | '/docs/algorand'
     | '/docs/x402'
@@ -345,6 +357,7 @@ export interface RootRouteChildren {
   ApiReceiptRoute: typeof ApiReceiptRoute
   ApiSummarizeRoute: typeof ApiSummarizeRouteWithChildren
   ApiToolsRoute: typeof ApiToolsRoute
+  ApiTrustScoreRoute: typeof ApiTrustScoreRoute
   ApiX402DemoRoute: typeof ApiX402DemoRoute
   DocsAlgorandRoute: typeof DocsAlgorandRoute
   DocsX402Route: typeof DocsX402Route
@@ -475,6 +488,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/trust-score': {
+      id: '/api/trust-score'
+      path: '/api/trust-score'
+      fullPath: '/api/trust-score'
+      preLoaderRoute: typeof ApiTrustScoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/x402-demo': {
       id: '/api/x402-demo'
       path: '/api/x402-demo'
@@ -564,6 +584,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReceiptRoute: ApiReceiptRoute,
   ApiSummarizeRoute: ApiSummarizeRouteWithChildren,
   ApiToolsRoute: ApiToolsRoute,
+  ApiTrustScoreRoute: ApiTrustScoreRoute,
   ApiX402DemoRoute: ApiX402DemoRoute,
   DocsAlgorandRoute: DocsAlgorandRoute,
   DocsX402Route: DocsX402Route,

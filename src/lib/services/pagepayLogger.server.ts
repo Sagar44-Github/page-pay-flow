@@ -149,6 +149,96 @@ export function computeMetrics(limit = 200): PagePayMetrics {
   };
 }
 
+export interface AddressTrustScore {
+  address: string;
+  trustScore: number;
+  totalTransactions: number;
+  totalVolumeAtomic: number;
+  totalVolumeUsd: string;
+  totalAttempts: number;
+  successRate: number | null;
+  firstSeen: string | null;
+  lastSeen: string | null;
+}
+
+/**
+ * PAGEPAY TRUST SCORE FORMULA (0 - 100):
+ *
+ * 1. Transaction Volume Weight (Max 40 points):
+ *    - 10 points per settled transaction, capped at 40 points (4 settled txs = max 40 pts).
+ *
+ * 2. Success Rate Weight (Max 40 points):
+ *    - (settledTransactions / totalAttempts) * 40 points. (100% success rate = max 40 pts).
+ *
+ * 3. Monetary Volume Bonus (Max 20 points):
+ *    - 50 points per $1.00 USD spent, capped at 20 points ($0.40+ USD spent = max 20 pts).
+ *      (e.g., $0.10 spent = 5 bonus points).
+ *
+ * Formula:
+ *   trustScore = Math.min(100, Math.round(txCountPoints + successRatePoints + volumeBonusPoints))
+ *
+ * Baseline: If totalTransactions === 0, trustScore is 0 (neutral baseline for new addresses).
+ */
+export function computeTrustScoreForAddress(rawAddress: string): AddressTrustScore {
+  const address = rawAddress.trim().toUpperCase();
+  const addressEntries = entries.filter(
+    (e) => e.payer && e.payer.trim().toUpperCase() === address,
+  );
+
+  if (addressEntries.length === 0) {
+    return {
+      address: rawAddress.trim(),
+      trustScore: 0,
+      totalTransactions: 0,
+      totalVolumeAtomic: 0,
+      totalVolumeUsd: "$0.00",
+      totalAttempts: 0,
+      successRate: null,
+      firstSeen: null,
+      lastSeen: null,
+    };
+  }
+
+  const settled = addressEntries.filter((e) => e.outcome === "summarized" && e.txId);
+  const attempts = addressEntries.filter((e) =>
+    ["summarized", "payment_failed", "gateway_error", "paid_unfulfilled"].includes(e.outcome),
+  );
+
+  let usdcAtomic = 0;
+  for (const entry of settled) {
+    const match = entry.price.match(/\$([0-9.]+)/);
+    if (match?.[1]) usdcAtomic += Math.round(parseFloat(match[1]) * 1_000_000);
+  }
+
+  const totalTransactions = settled.length;
+  const totalAttempts = attempts.length > 0 ? attempts.length : settled.length;
+  const successRateRatio = totalAttempts > 0 ? settled.length / totalAttempts : 0;
+  const successRate = totalAttempts > 0 ? Number((successRateRatio * 100).toFixed(1)) : null;
+
+  const sortedTimestamps = addressEntries.map((e) => e.timestamp).sort();
+  const firstSeen = sortedTimestamps[0] ?? null;
+  const lastSeen = sortedTimestamps[sortedTimestamps.length - 1] ?? null;
+
+  const txCountPoints = Math.min(40, totalTransactions * 10);
+  const successRatePoints = Math.round(successRateRatio * 40);
+  const usdVolume = usdcAtomic / 1_000_000;
+  const volumeBonusPoints = Math.min(20, Math.round(usdVolume * 50));
+
+  const trustScore = totalTransactions > 0 ? Math.min(100, txCountPoints + successRatePoints + volumeBonusPoints) : 0;
+
+  return {
+    address: rawAddress.trim(),
+    trustScore,
+    totalTransactions,
+    totalVolumeAtomic: usdcAtomic,
+    totalVolumeUsd: `$${usdVolume.toFixed(2)}`,
+    totalAttempts,
+    successRate,
+    firstSeen,
+    lastSeen,
+  };
+}
+
 export interface AuditVerificationResult {
   valid: boolean;
   totalEntries: number;
@@ -173,7 +263,6 @@ export function verifyAuditChain(): AuditVerificationResult {
   for (let i = 0; i < total; i++) {
     const current = entries[i];
 
-    // Check 1: Does current.previousEntryHash match expected previous entryHash?
     if (current.previousEntryHash !== expectedPreviousHash) {
       return {
         valid: false,
@@ -184,7 +273,6 @@ export function verifyAuditChain(): AuditVerificationResult {
       };
     }
 
-    // Check 2: Does current.entryHash match computed hash of current fields + previousEntryHash?
     const recomputedHash = computeEntryHash(current, current.previousEntryHash);
     if (current.entryHash !== recomputedHash) {
       return {
