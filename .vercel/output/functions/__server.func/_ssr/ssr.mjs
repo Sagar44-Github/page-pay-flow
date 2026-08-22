@@ -101,6 +101,10 @@ globalThis.location = globalThis.location || {
 	hash: "",
 	href: "http://localhost/"
 };
+if (typeof globalThis.getComputedStyle === "undefined") globalThis.getComputedStyle = () => ({
+	getPropertyValue: () => "",
+	direction: "ltr"
+});
 if (typeof globalThis.document === "undefined") {
 	const mockContext = {
 		fillStyle: "",
@@ -140,9 +144,14 @@ if (typeof globalThis.customElements === "undefined") globalThis.customElements 
 	define: () => {},
 	whenDefined: () => Promise.resolve()
 };
+if (typeof globalThis.ResizeObserver === "undefined") globalThis.ResizeObserver = class ResizeObserver {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+};
 var serverEntryPromise;
 async function getServerEntry() {
-	if (!serverEntryPromise) serverEntryPromise = import("./server-ptLNWahN.mjs").then((n) => n.t).then((m) => m.default ?? m);
+	if (!serverEntryPromise) serverEntryPromise = import("./server-C6P-fwpQ.mjs").then((n) => n.t).then((m) => m.default ?? m);
 	return serverEntryPromise;
 }
 async function normalizeCatastrophicSsrResponse(response) {

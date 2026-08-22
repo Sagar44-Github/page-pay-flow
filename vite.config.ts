@@ -6,12 +6,24 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-export default defineConfig({
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    server: { entry: "server" },
-  },
-  nitro: {
-    preset: process.env.VERCEL ? "vercel" : undefined,
-  },
+const isNetlify = Boolean(process.env.NETLIFY);
+const isVercel = Boolean(process.env.VERCEL);
+
+export default defineConfig(async () => {
+  const netlifyPlugins = isNetlify
+    ? [(await import("@netlify/vite-plugin-tanstack-start")).default()]
+    : [];
+
+  return {
+    tanstackStart: {
+      // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
+      server: { entry: "server" },
+    },
+    vite: {
+      plugins: netlifyPlugins,
+    },
+    nitro: {
+      preset: isNetlify ? "netlify" : isVercel ? "vercel" : undefined,
+    },
+  };
 });

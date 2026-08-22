@@ -46,6 +46,14 @@ if (typeof globalThis.customElements === "undefined") {
   };
 }
 
+if (typeof globalThis.ResizeObserver === "undefined") {
+  (globalThis as any).ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";

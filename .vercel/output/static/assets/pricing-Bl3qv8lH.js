@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-CfuWmoMz.js";import{t}from"./MarketingPage-DyMlgFH7.js";import{t as n}from"./Pricing-DfDo5K9k.js";var r=e();function i(){return(0,r.jsx)(t,{children:()=>(0,r.jsx)(`div`,{className:`py-8`,children:(0,r.jsx)(n,{})})})}export{i as component};

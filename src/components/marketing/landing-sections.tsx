@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
+import { ClientOnly } from "@/components/ClientOnly";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/marketing/Container";
@@ -42,9 +43,13 @@ export function Hero({ onTryIt }: { onTryIt: () => void }) {
     <section className="relative overflow-hidden border-b border-border">
       <div className="grid-marketing absolute inset-0 opacity-40" />
       <div className="pointer-events-none absolute -right-32 top-0 h-[520px] w-[520px] opacity-80">
-        <Suspense fallback={<div className="size-full rounded-full bg-accent-green/5 blur-3xl" />}>
-          <HeroScene className="size-full" />
-        </Suspense>
+        <ClientOnly
+          fallback={<div className="size-full rounded-full bg-accent-green/5 blur-3xl" />}
+        >
+          <Suspense fallback={<div className="size-full rounded-full bg-accent-green/5 blur-3xl" />}>
+            <HeroScene className="size-full" />
+          </Suspense>
+        </ClientOnly>
       </div>
       <Container className="relative py-20 md:py-28 lg:py-32">
         <div className="max-w-3xl">
