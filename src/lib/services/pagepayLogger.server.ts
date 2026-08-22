@@ -1,14 +1,19 @@
 /**
- * Structured request log for PagePay.
+ * Structured request log & tamper-evident audit trail for PagePay.
  *
- * The spec asks for JSON-Lines in `requests.log`. This app runs on an edge runtime
- * with no writable filesystem, so entries are kept in a bounded in-memory ring
- * buffer with the exact same JSON-Lines shape and mirrored to the console. The
- * dashboard reads them from GET /api/logs.
+ * Each log entry is cryptographically linked to the previous entry via SHA-256 hash.
+ * Modifying or deleting any past entry invalidates the hash chain and is immediately
+ * detectable by GET /api/audit/verify.
  */
+import { createHash } from "crypto";
 
 export type PaymentStatus =
-  "none" | "required" | "verified" | "settled" | "failed" | "gateway_timeout";
+  | "none"
+  | "required"
+  | "verified"
+  | "settled"
+  | "failed"
+  | "gateway_timeout";
 
 export type Outcome =
   | "quoted"
@@ -29,24 +34,66 @@ export interface PagePayLogEntry {
   payer?: string;
   txId?: string;
   reason?: string;
+
+  /** SHA-256 hash of the previous log entry in the chain. Genesis = 64 zeros. */
+  previousEntryHash: string;
+  /** SHA-256 hash of this entry's canonical fields + previousEntryHash. */
+  entryHash: string;
 }
+
+export const GENESIS_PREVIOUS_HASH = "0".repeat(64);
 
 const MAX_ENTRIES = 500;
 const entries: PagePayLogEntry[] = [];
 
-export function logRequest(entry: Omit<PagePayLogEntry, "timestamp">): PagePayLogEntry {
-  const full: PagePayLogEntry = { timestamp: new Date().toISOString(), ...entry };
+/**
+ * Deterministic SHA-256 computation over canonical entry fields.
+ * Field Order: timestamp|route|pages|price|paymentStatus|outcome|payer|txId|reason|previousEntryHash
+ */
+export function computeEntryHash(
+  entry: Omit<PagePayLogEntry, "entryHash" | "previousEntryHash">,
+  previousEntryHash: string,
+): string {
+  const canonicalString = [
+    entry.timestamp ?? "",
+    entry.route ?? "",
+    String(entry.pages ?? 0),
+    entry.price ?? "",
+    entry.paymentStatus ?? "",
+    entry.outcome ?? "",
+    entry.payer ?? "",
+    entry.txId ?? "",
+    entry.reason ?? "",
+    previousEntryHash,
+  ].join("|");
+
+  return createHash("sha256").update(canonicalString, "utf8").digest("hex");
+}
+
+export function logRequest(
+  entry: Omit<PagePayLogEntry, "timestamp" | "previousEntryHash" | "entryHash">,
+): PagePayLogEntry {
+  const timestamp = new Date().toISOString();
+  const previousEntryHash =
+    entries.length === 0 ? GENESIS_PREVIOUS_HASH : entries[entries.length - 1].entryHash;
+
+  const baseEntry = { timestamp, ...entry };
+  const entryHash = computeEntryHash(baseEntry, previousEntryHash);
+
+  const full: PagePayLogEntry = {
+    ...baseEntry,
+    previousEntryHash,
+    entryHash,
+  };
+
   entries.push(full);
   if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES);
 
   const line = JSON.stringify(full);
-  // 402-on-first-request is normal protocol traffic, not an error.
-  if (full.outcome === "payment_required" || full.outcome === "quoted") {
-    console.log(`[pagepay] ${line}`);
-  } else if (full.outcome === "summarized") {
-    console.log(`[pagepay] ${line}`);
+  if (full.outcome === "payment_required" || full.outcome === "quoted" || full.outcome === "summarized") {
+    console.log(`[pagepay:audit] ${line}`);
   } else {
-    console.error(`[pagepay] ${line}`);
+    console.error(`[pagepay:audit] ${line}`);
   }
   return full;
 }
@@ -100,4 +147,62 @@ export function computeMetrics(limit = 200): PagePayMetrics {
     recent402Count: required.length,
     recentSummarizedCount: settled.length,
   };
+}
+
+export interface AuditVerificationResult {
+  valid: boolean;
+  totalEntries: number;
+  brokenAt: number | null;
+  verifiedAt: string;
+  details?: string;
+}
+
+/**
+ * Walk the entire log chain from genesis to head and verify hash continuity.
+ */
+export function verifyAuditChain(): AuditVerificationResult {
+  const total = entries.length;
+  const verifiedAt = new Date().toISOString();
+
+  if (total === 0) {
+    return { valid: true, totalEntries: 0, brokenAt: null, verifiedAt };
+  }
+
+  let expectedPreviousHash = GENESIS_PREVIOUS_HASH;
+
+  for (let i = 0; i < total; i++) {
+    const current = entries[i];
+
+    // Check 1: Does current.previousEntryHash match expected previous entryHash?
+    if (current.previousEntryHash !== expectedPreviousHash) {
+      return {
+        valid: false,
+        totalEntries: total,
+        brokenAt: i,
+        verifiedAt,
+        details: `Entry #${i} previousEntryHash ('${current.previousEntryHash}') does not match expected previous entryHash ('${expectedPreviousHash}').`,
+      };
+    }
+
+    // Check 2: Does current.entryHash match computed hash of current fields + previousEntryHash?
+    const recomputedHash = computeEntryHash(current, current.previousEntryHash);
+    if (current.entryHash !== recomputedHash) {
+      return {
+        valid: false,
+        totalEntries: total,
+        brokenAt: i,
+        verifiedAt,
+        details: `Entry #${i} stored entryHash ('${current.entryHash}') does not match recomputed hash ('${recomputedHash}').`,
+      };
+    }
+
+    expectedPreviousHash = current.entryHash;
+  }
+
+  return { valid: true, totalEntries: total, brokenAt: null, verifiedAt };
+}
+
+/** Testing helper: Direct access to internal entries array for controlled tampering tests. */
+export function _getInternalEntries(): PagePayLogEntry[] {
+  return entries;
 }

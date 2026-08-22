@@ -31,6 +31,7 @@ import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsAlgorandRouteImport } from './routes/docs/algorand'
 import { Route as DocsX402RouteImport } from './routes/docs/x402'
 import { Route as ReceiptTxIdRouteImport } from './routes/receipt/$txId'
+import { Route as ApiAuditVerifyRouteImport } from './routes/api/audit/verify'
 import { Route as ApiSummarizeRangeRouteImport } from './routes/api/summarize/range'
 
 const IndexRoute = IndexRouteImport.update({
@@ -143,6 +144,11 @@ const ReceiptTxIdRoute = ReceiptTxIdRouteImport.update({
   path: '/receipt/$txId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuditVerifyRoute = ApiAuditVerifyRouteImport.update({
+  id: '/api/audit/verify',
+  path: '/api/audit/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSummarizeRangeRoute = ApiSummarizeRangeRouteImport.update({
   id: '/range',
   path: '/range',
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs/': typeof DocsIndexRoute
+  '/api/audit/verify': typeof ApiAuditVerifyRoute
   '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
 export interface FileRoutesByTo {
@@ -197,6 +204,7 @@ export interface FileRoutesByTo {
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs': typeof DocsIndexRoute
+  '/api/audit/verify': typeof ApiAuditVerifyRoute
   '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
 export interface FileRoutesById {
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs/': typeof DocsIndexRoute
+  '/api/audit/verify': typeof ApiAuditVerifyRoute
   '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
 export interface FileRouteTypes {
@@ -250,6 +259,7 @@ export interface FileRouteTypes {
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs/'
+    | '/api/audit/verify'
     | '/api/summarize/range'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -275,6 +285,7 @@ export interface FileRouteTypes {
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs'
+    | '/api/audit/verify'
     | '/api/summarize/range'
   id:
     | '__root__'
@@ -300,6 +311,7 @@ export interface FileRouteTypes {
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs/'
+    | '/api/audit/verify'
     | '/api/summarize/range'
   fileRoutesById: FileRoutesById
 }
@@ -326,6 +338,7 @@ export interface RootRouteChildren {
   DocsX402Route: typeof DocsX402Route
   ReceiptTxIdRoute: typeof ReceiptTxIdRoute
   DocsIndexRoute: typeof DocsIndexRoute
+  ApiAuditVerifyRoute: typeof ApiAuditVerifyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -484,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptTxIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/audit/verify': {
+      id: '/api/audit/verify'
+      path: '/api/audit/verify'
+      fullPath: '/api/audit/verify'
+      preLoaderRoute: typeof ApiAuditVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/summarize/range': {
       id: '/api/summarize/range'
       path: '/range'
@@ -529,6 +549,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsX402Route: DocsX402Route,
   ReceiptTxIdRoute: ReceiptTxIdRoute,
   DocsIndexRoute: DocsIndexRoute,
+  ApiAuditVerifyRoute: ApiAuditVerifyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

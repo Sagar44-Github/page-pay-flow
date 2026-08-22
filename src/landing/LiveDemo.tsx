@@ -12,6 +12,7 @@ import { MarkdownContent } from "@/components/marketing/MarkdownContent";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { RangeDemo } from "@/landing/RangeDemo";
 import { CompareDemo } from "@/landing/CompareDemo";
+import { AuditTrailWidget } from "@/components/audit/AuditTrailWidget";
 import { CurlExportButton } from "@/components/hackathon/CurlExportButton";
 import {
   PaymentHeaderInspector,
@@ -784,6 +785,9 @@ export function LiveDemo({
                 </div>
               </div>
             </Card>
+
+            {/* Tamper-Evident Audit Trail Widget */}
+            <AuditTrailWidget />
 
             {/* Protocol Proof Inspector Cards (rendered quietly below if available) */}
             {exchange && (
