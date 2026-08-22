@@ -168,3 +168,60 @@ export async function summarizeRange(
   }
 }
 
+const COMPARISON_SYSTEM_PROMPT =
+  "You are PagePay Document Comparator. You are given TWO documents: Document A and Document B. " +
+  "Perform a precise, structured, side-by-side comparison of the two texts. " +
+  "Structure your response with clear markdown headings:\n" +
+  "1. **Overview of Comparison** — a brief 2-3 sentence high-level summary of how Document A and Document B relate.\n" +
+  "2. **Present in Document A, Missing in Document B** — bulleted list of key clauses, terms, or provisions unique to Document A.\n" +
+  "3. **Present in Document B, Missing in Document A** — bulleted list of key clauses, terms, or provisions unique to Document B.\n" +
+  "4. **Side-by-Side Differences & Discrepancies** — a markdown table comparing specific dates, monetary amounts, penalties, obligations, or legal terms that differ between A and B.\n" +
+  "5. **Comparative Conclusion** — key takeaways regarding risk, scope, or financial impact differences.\n" +
+  "Never invent facts not present in either text.";
+
+export async function compareDocuments(
+  textA: string,
+  pagesA: number,
+  textB: string,
+  pagesB: number,
+  request: Request,
+): Promise<string> {
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const groqKey = process.env["GROQ_API_KEY"];
+  if (!lovableKey && !groqKey) {
+    throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
+  }
+
+  const prompt =
+    `DOCUMENT A (${pagesA} page${pagesA === 1 ? "" : "s"}):\n\n${textA}\n\n` +
+    `========================================\n\n` +
+    `DOCUMENT B (${pagesB} page${pagesB === 1 ? "" : "s"}):\n\n${textB}`;
+
+  try {
+    if (lovableKey) {
+      const gateway = createLovableAiGatewayProvider(lovableKey, getLovableAiGatewayRunId(request));
+      const result = streamText({
+        model: gateway(MODEL),
+        system: COMPARISON_SYSTEM_PROMPT,
+        prompt,
+      });
+      const summary = await result.text;
+      if (!summary.trim()) throw new SummarizerError("The model returned an empty response.");
+      return summary.trim();
+    }
+
+    const result = await groqChat({
+      messages: [
+        { role: "system", content: COMPARISON_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+      maxTokens: 1200,
+    });
+    return result.content;
+  } catch (error) {
+    if (error instanceof SummarizerError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new SummarizerError(`Document comparison failed: ${message}`);
+  }
+}
+

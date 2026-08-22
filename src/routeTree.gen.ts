@@ -18,6 +18,7 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProductRouteImport } from './routes/product'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as X402DemoRouteImport } from './routes/x402-demo'
+import { Route as ApiCompareRouteImport } from './routes/api/compare'
 import { Route as ApiGroqRouteImport } from './routes/api/groq'
 import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiMetricsRouteImport } from './routes/api/metrics'
@@ -75,6 +76,11 @@ const StatsRoute = StatsRouteImport.update({
 const X402DemoRoute = X402DemoRouteImport.update({
   id: '/x402-demo',
   path: '/x402-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCompareRoute = ApiCompareRouteImport.update({
+  id: '/api/compare',
+  path: '/api/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGroqRoute = ApiGroqRouteImport.update({
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/product': typeof ProductRoute
   '/stats': typeof StatsRoute
   '/x402-demo': typeof X402DemoRoute
+  '/api/compare': typeof ApiCompareRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/metrics': typeof ApiMetricsRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/product': typeof ProductRoute
   '/stats': typeof StatsRoute
   '/x402-demo': typeof X402DemoRoute
+  '/api/compare': typeof ApiCompareRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/metrics': typeof ApiMetricsRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/product': typeof ProductRoute
   '/stats': typeof StatsRoute
   '/x402-demo': typeof X402DemoRoute
+  '/api/compare': typeof ApiCompareRoute
   '/api/groq': typeof ApiGroqRoute
   '/api/logs': typeof ApiLogsRoute
   '/api/metrics': typeof ApiMetricsRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/product'
     | '/stats'
     | '/x402-demo'
+    | '/api/compare'
     | '/api/groq'
     | '/api/logs'
     | '/api/metrics'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/product'
     | '/stats'
     | '/x402-demo'
+    | '/api/compare'
     | '/api/groq'
     | '/api/logs'
     | '/api/metrics'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/product'
     | '/stats'
     | '/x402-demo'
+    | '/api/compare'
     | '/api/groq'
     | '/api/logs'
     | '/api/metrics'
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   ProductRoute: typeof ProductRoute
   StatsRoute: typeof StatsRoute
   X402DemoRoute: typeof X402DemoRoute
+  ApiCompareRoute: typeof ApiCompareRoute
   ApiGroqRoute: typeof ApiGroqRoute
   ApiLogsRoute: typeof ApiLogsRoute
   ApiMetricsRoute: typeof ApiMetricsRoute
@@ -378,6 +391,13 @@ declare module '@tanstack/react-router' {
       path: '/x402-demo'
       fullPath: '/x402-demo'
       preLoaderRoute: typeof X402DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/compare': {
+      id: '/api/compare'
+      path: '/api/compare'
+      fullPath: '/api/compare'
+      preLoaderRoute: typeof ApiCompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/groq': {
@@ -496,6 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductRoute: ProductRoute,
   StatsRoute: StatsRoute,
   X402DemoRoute: X402DemoRoute,
+  ApiCompareRoute: ApiCompareRoute,
   ApiGroqRoute: ApiGroqRoute,
   ApiLogsRoute: ApiLogsRoute,
   ApiMetricsRoute: ApiMetricsRoute,

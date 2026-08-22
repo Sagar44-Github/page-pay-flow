@@ -1,8 +1,7 @@
 /**
- * Shared request -> document intake, used by BOTH /api/price and /api/summarize
- * so the quoted page count can never disagree with the charged page count.
+ * Shared request -> document intake for single and multi-document endpoints.
  */
-import { MAX_UPLOAD_BYTES } from "@/lib/pagepay/pricing";
+import { MAX_UPLOAD_BYTES, MAX_PAGES } from "@/lib/pagepay/pricing";
 import {
   DocumentError,
   parsePdf,
@@ -44,5 +43,136 @@ export async function readDocumentFromRequest(request: Request): Promise<ParsedD
   return {
     ...parseTextInput(body.text),
     ...(typeof body.filename === "string" ? { filename: body.filename } : {}),
+  };
+}
+
+export interface TwoDocuments {
+  docA: ParsedDocument;
+  docB: ParsedDocument;
+  combinedPages: number;
+}
+
+async function parseSingleFromForm(
+  form: FormData,
+  fileKey: string,
+  textKey: string,
+  docLabel: string,
+): Promise<ParsedDocument> {
+  const file = form.get(fileKey);
+  const text = form.get(textKey);
+
+  if (file && typeof file !== "string") {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      throw new DocumentError(`${docLabel} is larger than the 10 MB limit.`);
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (isPdf) return parsePdf(bytes, file.name);
+    const decoded = new TextDecoder().decode(bytes);
+    return { ...parseTextInput(decoded), filename: file.name };
+  }
+
+  if (typeof text === "string" && text.trim().length > 0) {
+    return parseTextInput(text);
+  }
+
+  throw new DocumentError(`${docLabel} is missing or empty. Provide a file or text for ${docLabel}.`);
+}
+
+function parseSingleFromObject(
+  obj: unknown,
+  docLabel: string,
+): ParsedDocument {
+  if (!obj) {
+    throw new DocumentError(`${docLabel} is missing. Provide text or file for ${docLabel}.`);
+  }
+  if (typeof obj === "string") {
+    if (!obj.trim()) {
+      throw new DocumentError(`${docLabel} is empty.`);
+    }
+    try {
+      return parseTextInput(obj);
+    } catch (err) {
+      if (err instanceof DocumentError) {
+        throw new DocumentError(`${docLabel} is invalid: ${err.reason}`);
+      }
+      throw err;
+    }
+  }
+  if (typeof obj === "object" && obj !== null) {
+    const record = obj as { text?: unknown; filename?: unknown };
+    if (typeof record.text === "string" && record.text.trim().length > 0) {
+      try {
+        return {
+          ...parseTextInput(record.text),
+          ...(typeof record.filename === "string" ? { filename: record.filename } : {}),
+        };
+      } catch (err) {
+        if (err instanceof DocumentError) {
+          throw new DocumentError(`${docLabel} is invalid: ${err.reason}`);
+        }
+        throw err;
+      }
+    }
+  }
+  throw new DocumentError(`${docLabel} must be a text string or object with text.`);
+}
+
+export async function readTwoDocumentsFromRequest(request: Request): Promise<TwoDocuments> {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  let docA: ParsedDocument;
+  let docB: ParsedDocument;
+
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const hasA = form.has("fileA") || form.has("textA") || form.has("documentA");
+    const hasB = form.has("fileB") || form.has("textB") || form.has("documentB");
+
+    if (!hasA) {
+      throw new DocumentError("Document A is missing. Attach fileA/textA or documentA.");
+    }
+    if (!hasB) {
+      throw new DocumentError("Document B is missing. Attach fileB/textB or documentB.");
+    }
+
+    docA = await parseSingleFromForm(form, form.has("fileA") ? "fileA" : "documentA", form.has("textA") ? "textA" : "documentA", "Document A");
+    docB = await parseSingleFromForm(form, form.has("fileB") ? "fileB" : "documentB", form.has("textB") ? "textB" : "documentB", "Document B");
+  } else {
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      throw new DocumentError("Request body must be JSON or multipart/form-data.");
+    }
+
+    const body = (payload ?? {}) as Record<string, unknown>;
+
+    const valA = body["documentA"] ?? body["textA"] ?? body["docA"];
+    const valB = body["documentB"] ?? body["textB"] ?? body["docB"];
+
+    if (!valA) {
+      throw new DocumentError("Document A is missing. Provide documentA or textA in JSON.");
+    }
+    if (!valB) {
+      throw new DocumentError("Document B is missing. Provide documentB or textB in JSON.");
+    }
+
+    docA = parseSingleFromObject(valA, "Document A");
+    docB = parseSingleFromObject(valB, "Document B");
+  }
+
+  // Validate page counts individually against MAX_PAGES
+  if (docA.pages > MAX_PAGES) {
+    throw new DocumentError(`Document A exceeds the maximum allowed page count of ${MAX_PAGES} pages (got ${docA.pages}).`);
+  }
+  if (docB.pages > MAX_PAGES) {
+    throw new DocumentError(`Document B exceeds the maximum allowed page count of ${MAX_PAGES} pages (got ${docB.pages}).`);
+  }
+
+  return {
+    docA,
+    docB,
+    combinedPages: docA.pages + docB.pages,
   };
 }

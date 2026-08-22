@@ -16,6 +16,7 @@ import { ResilientFacilitatorClient } from "./facilitator.server";
 
 export const SUMMARIZE_ROUTE = "POST /api/summarize";
 export const RANGE_ROUTE = "POST /api/summarize/range";
+export const COMPARE_ROUTE = "POST /api/compare";
 /** Compiled default; the live value is getConfig().network. */
 export const X402_NETWORK = ALGORAND_TESTNET_CAIP2;
 
@@ -34,6 +35,12 @@ function readRangePageCount(context: HTTPRequestContext): number {
   const body = context.adapter.getBody?.() as { rangePages?: number } | undefined;
   const pages = Number(body?.rangePages ?? 1);
   return Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 1;
+}
+
+function readComparePageCount(context: HTTPRequestContext): number {
+  const body = context.adapter.getBody?.() as { comparePages?: number } | undefined;
+  const pages = Number(body?.comparePages ?? 2);
+  return Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 2;
 }
 
 function buildRoutes(): RoutesConfig {
@@ -107,6 +114,41 @@ function buildRoutes(): RoutesConfig {
           error: "Payment failed",
           reason: settleResult.errorMessage ?? settleResult.errorReason ?? "settlement rejected",
           pagesQuoted: readRangePageCount(context),
+        },
+      }),
+    },
+    [COMPARE_ROUTE]: {
+      description: "Pay-per-page AI multi-document comparison (Document A vs Document B)",
+      mimeType: "application/json",
+      accepts: {
+        scheme: "exact",
+        network,
+        payTo: () => {
+          const payTo = getConfig().payTo;
+          if (!payTo) throw new MissingPayToError();
+          return payTo;
+        },
+        price: (context) => priceForPages(readComparePageCount(context), getConfig().pricePerPageUsd),
+        maxTimeoutSeconds: 120,
+      },
+      unpaidResponseBody: (context) => {
+        const pages = readComparePageCount(context);
+        return {
+          contentType: "application/json",
+          body: {
+            error: "Payment required",
+            reason: `This comparison covers ${pages} page(s) combined (Document A + Document B) at $0.01 per page. Attach an X-PAYMENT header signed for one of the payment requirements above.`,
+            pagesQuoted: pages,
+            priceQuoted: priceForPages(pages),
+          },
+        };
+      },
+      settlementFailedResponseBody: (context, settleResult) => ({
+        contentType: "application/json",
+        body: {
+          error: "Payment failed",
+          reason: settleResult.errorMessage ?? settleResult.errorReason ?? "settlement rejected",
+          pagesQuoted: readComparePageCount(context),
         },
       }),
     },

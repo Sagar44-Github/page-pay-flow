@@ -11,6 +11,7 @@ import { Container } from "@/components/marketing/Container";
 import { MarkdownContent } from "@/components/marketing/MarkdownContent";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { RangeDemo } from "@/landing/RangeDemo";
+import { CompareDemo } from "@/landing/CompareDemo";
 import { CurlExportButton } from "@/components/hackathon/CurlExportButton";
 import {
   PaymentHeaderInspector,
@@ -152,6 +153,7 @@ export function LiveDemo({
   wallet: PeraWallet;
   onOpenWalkthrough?: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"single" | "compare">("single");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<"summary" | "action_items" | "key_risks">("summary");
@@ -371,7 +373,40 @@ export function LiveDemo({
         </div>
 
         {/* ── Main Layout: 2 Columns on Desktop, Stacked on Mobile ── */}
-        <div className="mt-8 grid gap-8 lg:grid-cols-12">
+        {/* ── Workflow Sub-Navigation Tabs ── */}
+        <div className="mt-6 flex border-b border-border/80 pb-px">
+          <button
+            type="button"
+            onClick={() => setActiveTab("single")}
+            className={cn(
+              "px-4 py-2 text-xs font-mono font-semibold transition-all border-b-2 -mb-px",
+              activeTab === "single"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            📄 Single Document Summarization
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("compare")}
+            className={cn(
+              "px-4 py-2 text-xs font-mono font-semibold transition-all border-b-2 -mb-px flex items-center gap-1.5",
+              activeTab === "compare"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            ⚖️ Compare Two Documents (Multi-Doc)
+          </button>
+        </div>
+
+        {activeTab === "compare" ? (
+          <div className="mt-8">
+            <CompareDemo wallet={wallet} />
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-8 lg:grid-cols-12">
           
           {/* ── LEFT COLUMN: Document Input, Mode & Primary Action (6 Cols) ── */}
           <div className="space-y-6 lg:col-span-6">
@@ -795,6 +830,7 @@ export function LiveDemo({
             )}
           </div>
         </div>
+        )}
       </Container>
     </section>
   );

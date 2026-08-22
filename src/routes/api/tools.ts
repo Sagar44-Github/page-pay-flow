@@ -62,6 +62,16 @@ export function handleGetTools(): Response {
         pricingRule: "price = (endPage - startPage + 1) * pricePerPageUsd",
       },
       {
+        path: "/api/compare",
+        method: "POST",
+        description: "Compare two documents side-by-side (Document A vs Document B)",
+        input: {
+          documentA: "File upload ('fileA') OR text string ('textA' / 'documentA')",
+          documentB: "File upload ('fileB') OR text string ('textB' / 'documentB')",
+        },
+        pricingRule: "price = (pagesInA + pagesInB) * pricePerPageUsd",
+      },
+      {
         path: "/api/price",
         method: "GET | POST",
         description: "Quote document page count and price before payment",
