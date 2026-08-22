@@ -1,3 +1,45 @@
+// Polyfill browser globals for Node.js SSR runtime (e.g. Vercel Serverless Functions)
+if (typeof globalThis.self === "undefined") {
+  (globalThis as any).self = globalThis;
+}
+if (typeof globalThis.window === "undefined") {
+  (globalThis as any).window = globalThis;
+}
+(globalThis as any).addEventListener = (globalThis as any).addEventListener || (() => {});
+(globalThis as any).removeEventListener = (globalThis as any).removeEventListener || (() => {});
+(globalThis as any).location = (globalThis as any).location || { pathname: "/", search: "", hash: "", href: "http://localhost/" };
+if (typeof globalThis.document === "undefined") {
+  const mockContext = { fillStyle: "", fillRect: () => {}, getImageData: () => ({ data: [] }) };
+  const dummyEl = { setAttribute: () => {}, getAttribute: () => null, style: {}, getContext: () => mockContext, appendChild: () => {} };
+  (globalThis as any).document = {
+    createElement: () => dummyEl,
+    createTextNode: () => dummyEl,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    getElementsByTagName: () => [],
+    head: dummyEl,
+    body: dummyEl,
+    documentElement: dummyEl,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+}
+if (typeof globalThis.HTMLElement === "undefined") {
+  class DummyNode {}
+  (globalThis as any).HTMLElement = DummyNode;
+  (globalThis as any).Element = DummyNode;
+  (globalThis as any).Node = DummyNode;
+  (globalThis as any).Event = DummyNode;
+  (globalThis as any).CustomEvent = DummyNode;
+}
+if (typeof globalThis.customElements === "undefined") {
+  (globalThis as any).customElements = {
+    get: () => undefined,
+    define: () => {},
+    whenDefined: () => Promise.resolve(),
+  };
+}
+
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";

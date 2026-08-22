@@ -1,8 +1,11 @@
 /**
  * Pera Wallet ONLY — official @perawallet/connect on Algorand Testnet.
  * No multi-wallet chooser: connect() goes straight into Pera's flow.
+ *
+ * NOTE: @perawallet/connect is browser-only (references `self`).
+ * We lazy-import it inside getPera() so SSR on Node.js never loads the module.
  */
-import { PeraWalletConnect } from "@perawallet/connect";
+import type { PeraWalletConnect as PeraWalletConnectType } from "@perawallet/connect";
 import algosdk from "algosdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -24,31 +27,40 @@ export interface PeraWallet {
 }
 
 export function usePeraWallet(): PeraWallet {
-  const peraRef = useRef<PeraWalletConnect | null>(null);
+  const peraRef = useRef<PeraWalletConnectType | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getPera = useCallback(() => {
+  const getPera = useCallback(async () => {
     if (!peraRef.current) {
+      const { PeraWalletConnect } = await import("@perawallet/connect");
       peraRef.current = new PeraWalletConnect({ chainId: PERA_CHAIN_TESTNET });
     }
     return peraRef.current;
   }, []);
 
   useEffect(() => {
-    const pera = getPera();
-    pera
-      .reconnectSession()
-      .then((accounts) => {
-        if (accounts.length > 0 && accounts[0]) setAddress(accounts[0]);
-        pera.connector?.on("disconnect", () => setAddress(null));
-      })
-      .catch(() => {
-        /* no previous session */
-      });
+    if (typeof window === "undefined") return;
+    let mounted = true;
+    getPera().then((pera) => {
+      if (!mounted) return;
+      pera
+        .reconnectSession()
+        .then((accounts) => {
+          if (!mounted) return;
+          if (accounts.length > 0 && accounts[0]) setAddress(accounts[0]);
+          pera.connector?.on("disconnect", () => setAddress(null));
+        })
+        .catch(() => {
+          /* no previous session */
+        });
+    });
     return () => {
-      pera.connector?.off("disconnect");
+      mounted = false;
+      if (peraRef.current?.connector) {
+        peraRef.current.connector.off("disconnect");
+      }
     };
   }, [getPera]);
 
@@ -56,7 +68,7 @@ export function usePeraWallet(): PeraWallet {
     setError(null);
     setConnecting(true);
     try {
-      const pera = getPera();
+      const pera = await getPera();
       const accounts = await pera.connect();
       pera.connector?.on("disconnect", () => setAddress(null));
       if (accounts.length === 0 || !accounts[0]) {
@@ -78,7 +90,8 @@ export function usePeraWallet(): PeraWallet {
 
   const disconnect = useCallback(async () => {
     try {
-      await getPera().disconnect();
+      const pera = await getPera();
+      await pera.disconnect();
     } catch {
       /* ignore */
     }
@@ -92,7 +105,7 @@ export function usePeraWallet(): PeraWallet {
       address,
       async signTransactions(txns: Uint8Array[], indexesToSign?: number[]) {
         const indexes = indexesToSign ?? txns.map((_, index) => index);
-        const pera = getPera();
+        const pera = await getPera();
         console.log("[pagepay] pera signTransactions", {
           txnCount: txns.length,
           indexes,
