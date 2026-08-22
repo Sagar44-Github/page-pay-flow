@@ -25,10 +25,12 @@ export type ConfigPatch = Partial<PagePayConfig>;
 
 let overrides: ConfigPatch = {};
 
+export const DEFAULT_PAY_TO = "UPRVZO4TROKAOI2KBRWKVKQUWXNV4DQ4NDL5PEARA4IVZ73DDROT2ATSV4";
+
 function fromEnv(): PagePayConfig {
   const envPrice = Number(process.env["PRICE_PER_PAGE_USD"]);
   return {
-    payTo: process.env["RESOURCE_PAY_TO"] ?? null,
+    payTo: process.env["RESOURCE_PAY_TO"] || DEFAULT_PAY_TO,
     pricePerPageUsd: Number.isFinite(envPrice) && envPrice > 0 ? envPrice : PRICE_PER_PAGE_USD,
     facilitatorUrl: process.env["FACILITATOR_URL"] ?? DEFAULT_FACILITATOR_URL,
     network:

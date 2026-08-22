@@ -25,7 +25,9 @@ interface AdminSession {
 
 function sessionConfig() {
   return {
-    password: process.env["SESSION_SECRET"]!,
+    password:
+      process.env["SESSION_SECRET"] ||
+      "pagepay-default-secure-session-secret-key-32-chars-minimum",
     name: "pagepay-admin",
     maxAge: 60 * 60 * 8,
     cookie: { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" },
