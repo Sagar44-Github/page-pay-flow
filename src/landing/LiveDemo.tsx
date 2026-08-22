@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { PeraWallet } from "@/lib/algorand/pera.client";
+import type { PeraWallet } from "@/lib/wallet/pera";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -247,26 +247,27 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
       const result = await runAgentWithPolicy(
         "/api/summarize",
         { method: "POST", headers, body },
-        wallet.getSigner(),
+        wallet.signer!,
         policy,
         SESSION_TRACKER,
+        mode,
       );
 
-      setExchange(result);
+      setExchange(result.paidResult ?? null);
 
-      if (result.ok) {
+      if (result.allowed && result.paidResult?.ok) {
         setPhase("complete");
         toast.success("Document summarized! USDC payment settled on Algorand testnet.");
       } else {
         setPhase(null);
-        if (result.policyRefused) {
+        if (!result.allowed) {
           setError({
-            message: `Agent Spend Policy Refusal: ${result.policyRefusalReason}`,
+            message: `Agent Spend Policy Refusal: ${result.refusalReason}`,
           });
-        } else if (result.failureCode) {
-          setError(FAILURE_COPY[result.failureCode] ?? { message: result.error ?? "Payment failed" });
+        } else if (result.paidResult?.failureCode) {
+          setError(FAILURE_COPY[result.paidResult.failureCode] ?? { message: result.paidResult?.error ?? "Payment failed" });
         } else {
-          setError({ message: result.error ?? "Request failed" });
+          setError({ message: result.paidResult?.error ?? "Request failed" });
         }
       }
     } catch (err) {

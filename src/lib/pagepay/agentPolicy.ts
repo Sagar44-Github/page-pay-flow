@@ -95,7 +95,7 @@ export const DEFAULT_AGENT_POLICY: AgentSpendPolicy = {
  */
 export function checkPreflightPolicy(
   endpoint: string,
-  mode: "summary" | "action_items" | "key_risks",
+  mode: "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist",
   policy: AgentSpendPolicy,
 ): PolicyCheckResult | null {
   // Normalize endpoint path to URL pathname (e.g. "http://localhost:8080/api/summarize" -> "/api/summarize")
@@ -190,7 +190,7 @@ export async function runAgentWithPolicy(
   signer: WalletSigner,
   policy: AgentSpendPolicy,
   session: AgentSessionTracker,
-  mode: "summary" | "action_items" | "key_risks" = "summary",
+  mode: "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist" = "summary",
   options: PayAndFetchOptions = {},
 ): Promise<AgentPolicyExecutionResult> {
   const timestamp = new Date().toISOString();

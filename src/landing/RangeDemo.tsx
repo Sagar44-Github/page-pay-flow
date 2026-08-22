@@ -105,7 +105,7 @@ export function RangeDemo({
 
   async function handleSummarizeRange() {
     if (!rangeValid) return;
-    if (!wallet.isConnected) {
+    if (!wallet.signer || !wallet.address) {
       setError({ message: "Connect Pera Wallet to pay for this range.", action: "connect" });
       return;
     }
@@ -141,8 +141,8 @@ export function RangeDemo({
       const result = await payAndFetch(
         "/api/summarize/range",
         { method: "POST", headers, body },
-        wallet.getSigner(),
-        (p) => setPhase(p)
+        wallet.signer!,
+        { onPhase: (p) => setPhase(p) }
       );
 
       if (!result.ok || !result.result) {
