@@ -53,7 +53,7 @@ async function handleRangeSummarize({ request }: { request: Request }): Promise<
     startPage = Number(form.get("startPage") ?? 1);
     endPage = Number(form.get("endPage") ?? 1);
     const rawMode = String(form.get("mode") ?? "summary");
-    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary" || rawMode === "compliance_check") {
+    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary" || rawMode === "compliance_check" || rawMode === "checklist") {
       mode = rawMode;
     }
     const existingSessionId = form.get("sessionId");
@@ -92,7 +92,7 @@ async function handleRangeSummarize({ request }: { request: Request }): Promise<
     startPage = Number(payload["startPage"] ?? 1);
     endPage = Number(payload["endPage"] ?? 1);
     const rawMode = String(payload["mode"] ?? "summary");
-    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary" || rawMode === "compliance_check" || rawMode === "checklist") {
       mode = rawMode;
     }
     const existingSessionId = payload["sessionId"] as string | undefined;

@@ -147,7 +147,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
   const [activeTab, setActiveTab] = useState<"single" | "compare">("single");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [mode, setMode] = useState<"summary" | "action_items" | "key_risks" | "compliance_check">("summary");
+  const [mode, setMode] = useState<"summary" | "action_items" | "key_risks" | "compliance_check" | "checklist">("summary");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [running, setRunning] = useState(false);
@@ -381,7 +381,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                   <Label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-2 block">
                     Extraction Mode
                   </Label>
-                  <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/30 p-1 font-mono text-xs">
+                  <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-muted/30 p-1 font-mono text-xs">
                     <button
                       type="button"
                       onClick={() => setMode("summary")}
@@ -422,7 +422,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                       type="button"
                       onClick={() => setMode("compliance_check")}
                       className={cn(
-                        "py-1.5 px-2 text-center rounded transition-all",
+                        "py-1.5 px-2 text-center rounded transition-all col-span-2 sm:col-span-1",
                         mode === "compliance_check"
                           ? "bg-background text-foreground shadow-sm font-semibold border border-border/50 text-primary font-bold"
                           : "text-muted-foreground hover:text-foreground"
@@ -430,12 +430,25 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
                     >
                       Compliance Check
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("checklist")}
+                      className={cn(
+                        "py-1.5 px-2 text-center rounded transition-all col-span-1",
+                        mode === "checklist"
+                          ? "bg-background text-foreground shadow-sm font-semibold border border-border/50 text-primary font-bold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      Checklist
+                    </button>
                   </div>
                   <p className="mt-2 font-mono text-[11px] text-muted-foreground">
                     {mode === "summary" && "Standard document overview & key points."}
                     {mode === "action_items" && "Extract concrete tasks, assignees, and deadlines."}
                     {mode === "key_risks" && "Identify risky, concerning clauses and severities."}
                     {mode === "compliance_check" && "Contract compliance checklist against parties, dates, breach, exit & governing law."}
+                    {mode === "checklist" && "Flat, step-by-step implementation checklist (- [ ]) for operationalizing the document."}
                   </p>
                 </div>
 

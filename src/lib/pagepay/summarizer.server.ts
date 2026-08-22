@@ -7,7 +7,7 @@ import { streamText } from "ai";
 import { createLovableAiGatewayProvider, getLovableAiGatewayRunId } from "@/lib/ai-gateway.server";
 import { groqChat } from "@/lib/groq/groq.server";
 
-export type ExtractionMode = "summary" | "action_items" | "key_risks" | "compliance_check";
+export type ExtractionMode = "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist";
 
 const MODEL = "google/gemini-2.5-flash";
 
@@ -47,6 +47,17 @@ const PROMPTS: Record<ExtractionMode, { system: string; userLabel: string }> = {
       "Follow the checklist with a brief 2-sentence 'Compliance Summary' paragraph.",
     userLabel: "Document (Compliance Check)",
   },
+  checklist: {
+    system:
+      "You are PagePay Process & Implementation Planner. Your task is to convert the provided document's content into a flat, actionable, step-by-step implementation checklist that an operator or agent can check off to execute or comply with whatever procedure, agreement, policy, or workflow the document describes.\n\n" +
+      "CRITICAL FORMAT & STRUCTURE RULES:\n" +
+      "1. Format EVERY single actionable step strictly using markdown checkbox syntax: '- [ ] Step description'.\n" +
+      "2. Group steps under short, descriptive markdown section headers (e.g., '### Phase 1: Preparation', '### Phase 2: Implementation', '### Phase 3: Monitoring & Exit') based on the document's natural workflow.\n" +
+      "3. Frame every item as an ordered, imperative implementation step someone must carry out (even if the source document wasn't written as a step-by-step guide).\n" +
+      "4. Conclude your response with a section titled '**Implementation Notes & Ambiguities**' containing a 1-2 sentence note explaining any implicit assumptions or ambiguities that had to be interpreted to form the checklist.\n" +
+      "5. DO NOT use compliance presence/absence markers (such as ✅ or ❌). DO NOT use risk severities (High/Medium/Low). Focus purely on an ordered, checkable step-by-step implementation plan.",
+    userLabel: "Document (Implementation Checklist)",
+  },
 };
 
 const RANGE_PROMPTS: Record<ExtractionMode, { system: string; userLabel: string }> = {
@@ -79,7 +90,24 @@ const RANGE_PROMPTS: Record<ExtractionMode, { system: string; userLabel: string 
       "Structure your response strictly as a markdown compliance checklist using '✅ Category: Present — note' or '❌ Category: Not mentioned — note'. Follow with a 2-sentence summary.",
     userLabel: "Document pages (Compliance Check)",
   },
+  checklist: {
+    system:
+      "You are PagePay Process & Implementation Planner. You are processing a specific PAGE RANGE of a larger document. " +
+      "Convert ONLY these pages into a flat, actionable implementation checklist using '- [ ] Step description' grouped under phase headings. Conclude with a 1-2 sentence note on any ambiguities interpreted.",
+    userLabel: "Document pages (Implementation Checklist)",
+  },
 };
+
+const COMPARISON_SYSTEM_PROMPT =
+  "You are PagePay Document Comparator. You are given TWO documents: Document A and Document B. " +
+  "Perform a precise, structured, side-by-side comparison of the two texts. " +
+  "Structure your response with clear markdown headings:\n" +
+  "1. **Overview of Comparison** — a brief 2-3 sentence high-level summary of how Document A and Document B relate.\n" +
+  "2. **Present in Document A, Missing in Document B** — bulleted list of key clauses, terms, or provisions unique to Document A.\n" +
+  "3. **Present in Document B, Missing in Document A** — bulleted list of key clauses, terms, or provisions unique to Document B.\n" +
+  "4. **Side-by-Side Differences & Discrepancies** — a markdown table comparing specific dates, monetary amounts, penalties, obligations, or legal terms that differ between A and B.\n" +
+  "5. **Comparative Conclusion** — key takeaways regarding risk, scope, or financial impact differences.\n" +
+  "Never invent facts not present in either text.";
 
 export class SummarizerError extends Error {
   constructor(message: string) {
@@ -111,45 +139,41 @@ export async function summarizeDocument(
         system: promptConfig.system,
         prompt,
       });
-      const summary = await result.text;
-      if (!summary.trim()) throw new SummarizerError("The model returned an empty response.");
-      return summary.trim();
+      return await result.text;
     }
 
-    const result = await groqChat({
+    const res = await groqChat({
       messages: [
         { role: "system", content: promptConfig.system },
         { role: "user", content: prompt },
       ],
       maxTokens: 900,
     });
-    return result.content;
+    return res.content;
   } catch (error) {
-    if (error instanceof SummarizerError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    throw new SummarizerError(`Processing failed (${mode}): ${message}`);
+    if (error instanceof Error) {
+      throw new SummarizerError(`LLM generation failed: ${error.message}`);
+    }
+    throw new SummarizerError("LLM generation failed with an unknown error.");
   }
 }
 
-export async function summarizeRange(
-  rangeText: string,
+export async function summarizePageRange(
+  text: string,
   startPage: number,
   endPage: number,
-  totalPages: number,
   request: Request,
   mode: ExtractionMode = "summary",
 ): Promise<string> {
+  const pages = endPage - startPage + 1;
+  const promptConfig = RANGE_PROMPTS[mode] ?? RANGE_PROMPTS.summary;
+  const prompt = `${promptConfig.userLabel} (Pages ${startPage} through ${endPage}, ${pages} page${pages === 1 ? "" : "s"} total):\n\n${text}`;
+
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const groqKey = process.env["GROQ_API_KEY"];
   if (!lovableKey && !groqKey) {
     throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
   }
-
-  const promptConfig = RANGE_PROMPTS[mode] ?? RANGE_PROMPTS.summary;
-  const rangePages = endPage - startPage + 1;
-  const prompt =
-    `${promptConfig.userLabel} ${startPage}–${endPage} of ${totalPages} ` +
-    `(${rangePages} page${rangePages === 1 ? "" : "s"}):\n\n${rangeText}`;
 
   try {
     if (lovableKey) {
@@ -159,36 +183,26 @@ export async function summarizeRange(
         system: promptConfig.system,
         prompt,
       });
-      const summary = await result.text;
-      if (!summary.trim()) throw new SummarizerError("The model returned an empty response.");
-      return summary.trim();
+      return await result.text;
     }
 
-    const result = await groqChat({
+    const res = await groqChat({
       messages: [
         { role: "system", content: promptConfig.system },
         { role: "user", content: prompt },
       ],
       maxTokens: 600,
     });
-    return result.content;
+    return res.content;
   } catch (error) {
-    if (error instanceof SummarizerError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    throw new SummarizerError(`Range processing failed (${mode}): ${message}`);
+    if (error instanceof Error) {
+      throw new SummarizerError(`LLM range generation failed: ${error.message}`);
+    }
+    throw new SummarizerError("LLM range generation failed with an unknown error.");
   }
 }
 
-const COMPARISON_SYSTEM_PROMPT =
-  "You are PagePay Document Comparator. You are given TWO documents: Document A and Document B. " +
-  "Perform a precise, structured, side-by-side comparison of the two texts. " +
-  "Structure your response with clear markdown headings:\n" +
-  "1. **Overview of Comparison** — a brief 2-3 sentence high-level summary of how Document A and Document B relate.\n" +
-  "2. **Present in Document A, Missing in Document B** — bulleted list of key clauses, terms, or provisions unique to Document A.\n" +
-  "3. **Present in Document B, Missing in Document A** — bulleted list of key clauses, terms, or provisions unique to Document B.\n" +
-  "4. **Side-by-Side Differences & Discrepancies** — a markdown table comparing specific dates, monetary amounts, penalties, obligations, or legal terms that differ between A and B.\n" +
-  "5. **Comparative Conclusion** — key takeaways regarding risk, scope, or financial impact differences.\n" +
-  "Never invent facts not present in either text.";
+export const summarizeRange = summarizePageRange;
 
 export async function compareDocuments(
   textA: string,
@@ -216,22 +230,21 @@ export async function compareDocuments(
         system: COMPARISON_SYSTEM_PROMPT,
         prompt,
       });
-      const summary = await result.text;
-      if (!summary.trim()) throw new SummarizerError("The model returned an empty response.");
-      return summary.trim();
+      return await result.text;
     }
 
-    const result = await groqChat({
+    const res = await groqChat({
       messages: [
         { role: "system", content: COMPARISON_SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
       maxTokens: 1200,
     });
-    return result.content;
+    return res.content;
   } catch (error) {
-    if (error instanceof SummarizerError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    throw new SummarizerError(`Document comparison failed: ${message}`);
+    if (error instanceof Error) {
+      throw new SummarizerError(`Document comparison failed: ${error.message}`);
+    }
+    throw new SummarizerError("Document comparison failed with an unknown error.");
   }
 }
