@@ -70,7 +70,7 @@ interface Props {
   totalPages: number;
   file: File | null;
   text: string;
-  mode?: "summary" | "action_items" | "key_risks";
+  mode?: "summary" | "action_items" | "key_risks" | "compliance_check";
 }
 
 export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: Props) {

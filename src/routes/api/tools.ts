@@ -45,7 +45,7 @@ export function handleGetTools(): Response {
         description: "Summarize an entire document (whole document metering)",
         input: {
           file: "File upload via multipart/form-data ('file') OR text string via JSON ('text')",
-          mode: "Optional extraction mode: 'summary' | 'action_items' | 'key_risks' (default: 'summary')",
+          mode: "Optional extraction mode: 'summary' | 'action_items' | 'key_risks' | 'compliance_check' (default: 'summary')",
         },
         pricingRule: "price = totalPages * pricePerPageUsd",
       },
@@ -57,7 +57,7 @@ export function handleGetTools(): Response {
           file: "File upload ('file') OR text string ('text') OR session ID ('sessionId')",
           startPage: "1-indexed start page (inclusive, default: 1)",
           endPage: "1-indexed end page (inclusive, default: 1)",
-          mode: "Optional extraction mode: 'summary' | 'action_items' | 'key_risks' (default: 'summary')",
+          mode: "Optional extraction mode: 'summary' | 'action_items' | 'key_risks' | 'compliance_check' (default: 'summary')",
         },
         pricingRule: "price = (endPage - startPage + 1) * pricePerPageUsd",
       },
@@ -93,6 +93,10 @@ export function handleGetTools(): Response {
       {
         name: "key_risks",
         description: "Flagged risks, liabilities, ambiguous clauses, and red flags categorized by severity",
+      },
+      {
+        name: "compliance_check",
+        description: "Contract and document compliance checklist evaluating parties, dates, breach remedies, exit clauses, and dispute resolution",
       },
     ],
   });

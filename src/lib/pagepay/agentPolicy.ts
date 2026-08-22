@@ -14,8 +14,8 @@ export interface AgentSpendPolicy {
   maxPricePerRequestUsd: number;
   /** Total USD budget allocated for this agent session. */
   sessionBudgetUsd: number;
-  /** Modes allowed for execution. E.g. ["summary", "action_items"]. */
-  allowedModes: Array<"summary" | "action_items" | "key_risks">;
+  /** Modes allowed for execution. E.g. ["summary", "action_items", "compliance_check"]. */
+  allowedModes: Array<"summary" | "action_items" | "key_risks" | "compliance_check">;
   /** Allowed endpoint paths. E.g. ["/api/summarize", "/api/summarize/range"]. */
   allowedEndpoints: string[];
 }

@@ -53,7 +53,7 @@ async function handleRangeSummarize({ request }: { request: Request }): Promise<
     startPage = Number(form.get("startPage") ?? 1);
     endPage = Number(form.get("endPage") ?? 1);
     const rawMode = String(form.get("mode") ?? "summary");
-    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary" || rawMode === "compliance_check") {
       mode = rawMode;
     }
     const existingSessionId = form.get("sessionId");

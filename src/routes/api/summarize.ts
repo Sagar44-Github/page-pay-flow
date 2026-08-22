@@ -40,7 +40,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
     try {
       const form = await cloned.formData();
       const rawMode = String(form.get("mode") ?? "summary");
-      if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+      if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary" || rawMode === "compliance_check") {
         mode = rawMode;
       }
     } catch {
@@ -51,7 +51,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
     try {
       const payload = (await cloned.json()) as Record<string, unknown>;
       const rawMode = String(payload["mode"] ?? "summary");
-      if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+      if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary" || rawMode === "compliance_check") {
         mode = rawMode;
       }
     } catch {

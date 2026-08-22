@@ -7,7 +7,7 @@ import { streamText } from "ai";
 import { createLovableAiGatewayProvider, getLovableAiGatewayRunId } from "@/lib/ai-gateway.server";
 import { groqChat } from "@/lib/groq/groq.server";
 
-export type ExtractionMode = "summary" | "action_items" | "key_risks";
+export type ExtractionMode = "summary" | "action_items" | "key_risks" | "compliance_check";
 
 const MODEL = "google/gemini-2.5-flash";
 
@@ -33,6 +33,20 @@ const PROMPTS: Record<ExtractionMode, { system: string; userLabel: string }> = {
       "Never invent risks not grounded in the text.",
     userLabel: "Document (Risk Analysis)",
   },
+  compliance_check: {
+    system:
+      "You are PagePay Compliance & Audit Specialist. Focus strictly on evaluating the document text against standard document and contract compliance categories:\n" +
+      "1. Clear Parties & Roles (are specific entities, signers, or roles named?)\n" +
+      "2. Dates & Deadlines (are effective dates, execution dates, or performance deadlines specified?)\n" +
+      "3. Breach & Non-Performance Provisions (does it specify remedies, penalties, or consequences of default?)\n" +
+      "4. Termination & Exit Clauses (does it define how the arrangement ends or notice periods?)\n" +
+      "5. Dispute Resolution & Governing Law (does it specify jurisdiction, arbitration, or governing law?)\n\n" +
+      "Structure your response strictly as a markdown compliance checklist. For EACH of the 5 categories above, evaluate the text and output either:\n" +
+      "- '✅ [Category Name]: Present — [one-line summary note from the text]'\n" +
+      "- '❌ [Category Name]: Not mentioned in this document — [brief explanation]'\n\n" +
+      "Follow the checklist with a brief 2-sentence 'Compliance Summary' paragraph.",
+    userLabel: "Document (Compliance Check)",
+  },
 };
 
 const RANGE_PROMPTS: Record<ExtractionMode, { system: string; userLabel: string }> = {
@@ -57,6 +71,13 @@ const RANGE_PROMPTS: Record<ExtractionMode, { system: string; userLabel: string 
       "Focus strictly on identifying risky, ambiguous, alarming, or notable clauses, statements, liabilities, or red flags in ONLY these pages. " +
       "Structure your response with markdown: a 'Risk Overview' paragraph, then a bulleted list of 'Flagged Risks & Liabilities' categorizing each risk by severity (High / Medium / Low), then a 'Mitigation / Cautionary Notes' section.",
     userLabel: "Document pages (Risk Analysis)",
+  },
+  compliance_check: {
+    system:
+      "You are PagePay Compliance & Audit Specialist. You are processing a specific PAGE RANGE of a larger document. " +
+      "Evaluate ONLY these pages against 5 core compliance categories: (1) Clear Parties & Roles, (2) Dates & Deadlines, (3) Breach & Non-Performance Provisions, (4) Termination & Exit Clauses, and (5) Dispute Resolution & Governing Law. " +
+      "Structure your response strictly as a markdown compliance checklist using '✅ Category: Present — note' or '❌ Category: Not mentioned — note'. Follow with a 2-sentence summary.",
+    userLabel: "Document pages (Compliance Check)",
   },
 };
 
@@ -110,16 +131,6 @@ export async function summarizeDocument(
   }
 }
 
-const RANGE_SYSTEM_PROMPT =
-  "You are PagePay, a precise document summarizer. You are summarizing a specific PAGE RANGE of a larger document. " +
-  "Produce a faithful summary of ONLY the provided pages. " +
-  "Use short markdown sections: a one-paragraph overview, then 3-8 key point bullets, then any explicit numbers, dates or obligations worth flagging. " +
-  "Never invent facts that are not in the document section.";
-
-/**
- * Summarize a specific page range of a document.
- * startPage and endPage are 1-indexed, inclusive on both ends.
- */
 export async function summarizeRange(
   rangeText: string,
   startPage: number,
@@ -224,4 +235,3 @@ export async function compareDocuments(
     throw new SummarizerError(`Document comparison failed: ${message}`);
   }
 }
-
