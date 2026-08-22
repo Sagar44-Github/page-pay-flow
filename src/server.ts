@@ -8,6 +8,12 @@ if (typeof globalThis.window === "undefined") {
 (globalThis as any).addEventListener = (globalThis as any).addEventListener || (() => {});
 (globalThis as any).removeEventListener = (globalThis as any).removeEventListener || (() => {});
 (globalThis as any).location = (globalThis as any).location || { pathname: "/", search: "", hash: "", href: "http://localhost/" };
+if (typeof globalThis.getComputedStyle === "undefined") {
+  (globalThis as any).getComputedStyle = () => ({
+    getPropertyValue: () => "",
+    direction: "ltr",
+  });
+}
 if (typeof globalThis.document === "undefined") {
   const mockContext = { fillStyle: "", fillRect: () => {}, getImageData: () => ({ data: [] }) };
   const dummyEl = { setAttribute: () => {}, getAttribute: () => null, style: {}, getContext: () => mockContext, appendChild: () => {} };
