@@ -39,9 +39,9 @@ Every transaction below was settled on Algorand Testnet using PagePay's HTTP 402
 
 - 🟢 **Transaction #1 (Single Summary - $0.01 Settled)**: [`VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q`](https://lora.algokit.io/testnet/transaction/VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q)
 - 🟢 **Transaction #2 (Compliance Check - $0.01 Settled)**: [`27J5GFWM32ZD2TBJ5KIVLXZE34BZMPRJA757G542LVX4UXRFNI4A`](https://lora.algokit.io/testnet/transaction/27J5GFWM32ZD2TBJ5KIVLXZE34BZMPRJA757G542LVX4UXRFNI4A)
-- 🟢 **Transaction #3 (Dual-Doc Compare - $0.02 Settled)**: [`5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPEEVEHMXV4HH26HN6`](https://lora.algokit.io/testnet/transaction/5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPEEVEHMXV4HH26HN6)
-- 🟢 **Transaction #4 (Page Range Selection - $0.03 Settled)**: [`SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA`](https://lora.algokit.io/testnet/transaction/SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA)
-- 🟢 **Transaction #5 (Checklist Mode - $0.01 Settled)**: [`WD4FH32FKXL5MAUOKUDTTZ3H76SGKVQNJASYPV4SICW6QQC5TAOT`](https://lora.algokit.io/testnet/transaction/WD4FH32FKXL5MAUOKUDTTZ3H76SGKVQNJASYPV4SICW6QQC5TAOT)
+- 🟢 **Transaction #3 (Dual-Doc Compare - $0.02 Settled)**: [`NVGTVZU36W5YORNYMVCFUKKPTEPIUS4ZGNBC6ZMR3QPYDEYXECJA`](https://lora.algokit.io/testnet/transaction/NVGTVZU36W5YORNYMVCFUKKPTEPIUS4ZGNBC6ZMR3QPYDEYXECJA)
+- 🟢 **Transaction #4 (Page Range Selection - $0.01 Settled)**: [`SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA`](https://lora.algokit.io/testnet/transaction/SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA)
+- 🟢 **Transaction #5 (Checklist Mode - $0.01 Settled)**: [`WD4FH3EUMLDU7BXZRRB3K7N7KQUQRN3RBKYRMVJ5J44ROTFVRBKQ`](https://lora.algokit.io/testnet/transaction/WD4FH3EUMLDU7BXZRRB3K7N7KQUQRN3RBKYRMVJ5J44ROTFVRBKQ)
 
 ### 🚀 4. Quick 2-Minute Local Setup & Testing
 
@@ -781,9 +781,9 @@ curl http://localhost:8080/api/tools
 
 PagePay automatically seeds in-memory logs on server boot with **real, independently verifiable Algorand Testnet transactions**:
 
-- `SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA` ($0.03 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA)
-- `WD4FH32FKXL5MAUOKUDTTZ3H76SGKVQNJASYPV4SICW6QQC5TAOT` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/WD4FH32FKXL5MAUOKUDTTZ3H76SGKVQNJASYPV4SICW6QQC5TAOT)
-- `5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPEEVEHMXV4HH26HN6` ($0.02 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPEEVEHMXV4HH26HN6)
+- `SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA)
+- `WD4FH3EUMLDU7BXZRRB3K7N7KQUQRN3RBKYRMVJ5J44ROTFVRBKQ` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/WD4FH3EUMLDU7BXZRRB3K7N7KQUQRN3RBKYRMVJ5J44ROTFVRBKQ)
+- `NVGTVZU36W5YORNYMVCFUKKPTEPIUS4ZGNBC6ZMR3QPYDEYXECJA` ($0.02 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/NVGTVZU36W5YORNYMVCFUKKPTEPIUS4ZGNBC6ZMR3QPYDEYXECJA)
 - `27J5GFWM32ZD2TBJ5KIVLXZE34BZMPRJA757G542LVX4UXRFNI4A` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/27J5GFWM32ZD2TBJ5KIVLXZE34BZMPRJA757G542LVX4UXRFNI4A)
 - `VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q` ($0.01 settled) — [Lora Explorer](https://lora.algokit.io/testnet/transaction/VPZ5GY2CF66MTSQZX3WBMAXEEOMV5SGZGCDNNK76ZK6XVKXUUU6Q)
 
@@ -802,7 +802,7 @@ PagePay automatically seeds in-memory logs on server boot with **real, independe
 ```ini
 RESOURCE_PAY_TO=UPRVZO4TROKAOI2KBRWKVKQUWXNV4DQ4NDL5PEARA4IVZ73DDROT2ATSV4
 GROQ_API_KEY=gsk_...
-TEST_PAYER_MNEMONIC="path atom field absorb old pretty couch round recycle ordinary scene supply rough fine canoe seven quote muscle mad enlist drastic rabbit coin ability parade"
+TEST_PAYER_MNEMONIC="<your funded testnet 24-word mnemonic here>"
 ```
 
 ### Development & Build Commands
