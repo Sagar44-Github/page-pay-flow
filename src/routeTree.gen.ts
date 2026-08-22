@@ -31,6 +31,7 @@ import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsAlgorandRouteImport } from './routes/docs/algorand'
 import { Route as DocsX402RouteImport } from './routes/docs/x402'
 import { Route as ReceiptTxIdRouteImport } from './routes/receipt/$txId'
+import { Route as ApiAuditTestTamperRouteImport } from './routes/api/audit/test-tamper'
 import { Route as ApiAuditVerifyRouteImport } from './routes/api/audit/verify'
 import { Route as ApiSummarizeRangeRouteImport } from './routes/api/summarize/range'
 
@@ -144,6 +145,11 @@ const ReceiptTxIdRoute = ReceiptTxIdRouteImport.update({
   path: '/receipt/$txId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuditTestTamperRoute = ApiAuditTestTamperRouteImport.update({
+  id: '/api/audit/test-tamper',
+  path: '/api/audit/test-tamper',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuditVerifyRoute = ApiAuditVerifyRouteImport.update({
   id: '/api/audit/verify',
   path: '/api/audit/verify',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs/': typeof DocsIndexRoute
+  '/api/audit/test-tamper': typeof ApiAuditTestTamperRoute
   '/api/audit/verify': typeof ApiAuditVerifyRoute
   '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs': typeof DocsIndexRoute
+  '/api/audit/test-tamper': typeof ApiAuditTestTamperRoute
   '/api/audit/verify': typeof ApiAuditVerifyRoute
   '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs/': typeof DocsIndexRoute
+  '/api/audit/test-tamper': typeof ApiAuditTestTamperRoute
   '/api/audit/verify': typeof ApiAuditVerifyRoute
   '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs/'
+    | '/api/audit/test-tamper'
     | '/api/audit/verify'
     | '/api/summarize/range'
   fileRoutesByTo: FileRoutesByTo
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs'
+    | '/api/audit/test-tamper'
     | '/api/audit/verify'
     | '/api/summarize/range'
   id:
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs/'
+    | '/api/audit/test-tamper'
     | '/api/audit/verify'
     | '/api/summarize/range'
   fileRoutesById: FileRoutesById
@@ -338,6 +350,7 @@ export interface RootRouteChildren {
   DocsX402Route: typeof DocsX402Route
   ReceiptTxIdRoute: typeof ReceiptTxIdRoute
   DocsIndexRoute: typeof DocsIndexRoute
+  ApiAuditTestTamperRoute: typeof ApiAuditTestTamperRoute
   ApiAuditVerifyRoute: typeof ApiAuditVerifyRoute
 }
 
@@ -497,6 +510,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptTxIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/audit/test-tamper': {
+      id: '/api/audit/test-tamper'
+      path: '/api/audit/test-tamper'
+      fullPath: '/api/audit/test-tamper'
+      preLoaderRoute: typeof ApiAuditTestTamperRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/audit/verify': {
       id: '/api/audit/verify'
       path: '/api/audit/verify'
@@ -549,6 +569,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsX402Route: DocsX402Route,
   ReceiptTxIdRoute: ReceiptTxIdRoute,
   DocsIndexRoute: DocsIndexRoute,
+  ApiAuditTestTamperRoute: ApiAuditTestTamperRoute,
   ApiAuditVerifyRoute: ApiAuditVerifyRoute,
 }
 export const routeTree = rootRouteImport
