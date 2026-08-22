@@ -11,38 +11,24 @@ export const MAX_PAGES = 20;
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_TEXT_CHARS = 400_000;
 
-/** Number of document pages grouped into a single payable chunk. */
-export const PAGES_PER_CHUNK = 2;
-
-export interface ChunkInfo {
-  /** 0-based chunk index. */
-  chunkIndex: number;
-  /** Total number of chunks for this document. */
-  totalChunks: number;
-  /** Number of pages in THIS chunk (may be < PAGES_PER_CHUNK for the last chunk). */
-  chunkPages: number;
-  /** 0-indexed start page (inclusive). */
-  startPage: number;
-  /** 0-indexed end page (exclusive). */
-  endPage: number;
-  /** Whether more chunks remain after this one. */
-  hasMore: boolean;
-}
-
-/** Compute chunk metadata for a given document size and chunk index. */
-export function chunkInfoForDocument(totalPages: number, chunkIndex: number): ChunkInfo {
-  const totalChunks = Math.max(1, Math.ceil(totalPages / PAGES_PER_CHUNK));
-  const clamped = Math.max(0, Math.min(chunkIndex, totalChunks - 1));
-  const startPage = clamped * PAGES_PER_CHUNK;
-  const endPage = Math.min(startPage + PAGES_PER_CHUNK, totalPages);
-  return {
-    chunkIndex: clamped,
-    totalChunks,
-    chunkPages: endPage - startPage,
-    startPage,
-    endPage,
-    hasMore: clamped < totalChunks - 1,
-  };
+/**
+ * Validate a caller-supplied page range (1-indexed, inclusive on both ends).
+ * Returns null if valid, or an error string if invalid.
+ */
+export function validatePageRange(
+  startPage: number,
+  endPage: number,
+  totalPages: number,
+): string | null {
+  if (!Number.isFinite(startPage) || !Number.isFinite(endPage)) {
+    return "startPage and endPage must be finite numbers.";
+  }
+  if (startPage < 1) return "startPage must be >= 1.";
+  if (endPage < startPage) return "endPage must be >= startPage.";
+  if (endPage > totalPages) {
+    return `endPage (${endPage}) exceeds the document's ${totalPages} page(s).`;
+  }
+  return null;
 }
 
 /** Page count for a raw text chunk: ceil(words / 500), minimum 1. */

@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Bot, Layers, FileText } from "lucide-react";
+import { Bot } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { MAX_PAGES, pagesForText, priceForPages } from "@/lib/pagepay/pricing";
 import { Container } from "@/components/marketing/Container";
 import { MarkdownContent } from "@/components/marketing/MarkdownContent";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
-import { ChunkDemo } from "@/landing/ChunkDemo";
+import { RangeDemo } from "@/landing/RangeDemo";
 import { CurlExportButton } from "@/components/hackathon/CurlExportButton";
 import {
   PaymentHeaderInspector,
@@ -36,6 +36,7 @@ interface Quote {
 
 interface SummaryResult {
   summary?: string;
+  mode?: string;
   pages?: number;
   pricePaid?: string;
   amountPaid?: string;
@@ -143,7 +144,7 @@ export function LiveDemo({
 }) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [mode, setMode] = useState<"all" | "chunk">("all");
+  const [mode, setMode] = useState<"summary" | "action_items" | "key_risks">("summary");
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [running, setRunning] = useState(false);
@@ -213,12 +214,13 @@ export function LiveDemo({
         ? (() => {
             const form = new FormData();
             form.set("file", file);
+            form.set("mode", mode);
             return { method: "POST", body: form };
           })()
         : {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({ text, mode }),
           };
 
       const result = await payAndFetch("/api/summarize", init, wallet.signer, {
@@ -286,41 +288,54 @@ export function LiveDemo({
             title="Real 402, real payment, real summary"
             description="Every response below comes from the live backend. Testnet USDC only."
           />
-          {onOpenWalkthrough && (
-            <Button variant="secondary" size="sm" onClick={onOpenWalkthrough}>
-              ? How it works
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            <a
+              href="/api/tools"
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-xs text-primary underline underline-offset-4 hover:text-primary/80"
+            >
+              🤖 For AI agents: /api/tools
+            </a>
+            {onOpenWalkthrough && (
+              <Button variant="secondary" size="sm" onClick={onOpenWalkthrough}>
+                ? How it works
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
           <div className="space-y-6">
-            {/* ── Mode toggle ── */}
-            <Card title="Mode">
-              <div className="flex gap-2">
+            {/* ── Mode Selector ── */}
+            <Card title="Extraction Mode">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                  variant={mode === "all" ? "default" : "secondary"}
+                  variant={mode === "summary" ? "default" : "secondary"}
                   size="sm"
-                  className="gap-2"
-                  onClick={() => setMode("all")}
+                  onClick={() => setMode("summary")}
                 >
-                  <FileText className="size-4" />
-                  Summarize all at once
+                  Summary
                 </Button>
                 <Button
-                  variant={mode === "chunk" ? "default" : "secondary"}
+                  variant={mode === "action_items" ? "default" : "secondary"}
                   size="sm"
-                  className="gap-2"
-                  onClick={() => setMode("chunk")}
+                  onClick={() => setMode("action_items")}
                 >
-                  <Layers className="size-4" />
-                  Chunk by chunk
+                  Action Items
+                </Button>
+                <Button
+                  variant={mode === "key_risks" ? "default" : "secondary"}
+                  size="sm"
+                  onClick={() => setMode("key_risks")}
+                >
+                  Key Risks
                 </Button>
               </div>
               <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                {mode === "all"
-                  ? "Pay once for the entire document summary."
-                  : "Pay per chunk — stop any time and only pay for what you've read."}
+                {mode === "summary" && "Standard document summary (overview, key points, flagged items)."}
+                {mode === "action_items" && "Extract concrete tasks, assignments, owners, and deadlines."}
+                {mode === "key_risks" && "Identify risky, concerning, or notable clauses and liabilities."}
               </p>
             </Card>
 
@@ -444,22 +459,24 @@ export function LiveDemo({
             </Card>
           </div>
 
-          {mode === "chunk" ? (
-            <ChunkDemo
-              wallet={wallet}
-              totalPages={quote?.pages ?? (localPages || 0)}
-              file={file}
-              text={text}
-            />
-          ) : (
           <div className="space-y-6">
-            <Card title="3 · Summary" walkthrough="summary">
+            <Card
+              title={`3 · ${
+                summary?.mode === "action_items"
+                  ? "Action Items"
+                  : summary?.mode === "key_risks"
+                    ? "Key Risks"
+                    : "Summary"
+              }`}
+              walkthrough="summary"
+            >
               {summary?.summary ? (
                 <>
                   <div className="rounded-lg border border-border/60 bg-background/40 p-4">
                     <MarkdownContent>{summary.summary}</MarkdownContent>
                   </div>
                   <div className="mt-4">
+                    <Row label="Mode">{summary.mode ?? "summary"}</Row>
                     <Row label="Pages paid">{summary.pages}</Row>
                     <Row label="Paid">
                       {summary.pricePaid} {summary.amountPaid ? `(${summary.amountPaid})` : ""}
@@ -584,6 +601,18 @@ export function LiveDemo({
               </>
             )}
           </div>
+
+          {/* ── Range summarization (appears when page count is known) ── */}
+          {(quote?.pages ?? (localPages && localPages > 0 ? localPages : 0)) > 0 && (
+            <div className="lg:col-span-2">
+              <RangeDemo
+                wallet={wallet}
+                totalPages={quote?.pages ?? localPages ?? 0}
+                file={file}
+                text={text}
+                mode={mode}
+              />
+            </div>
           )}
         </div>
       </Container>

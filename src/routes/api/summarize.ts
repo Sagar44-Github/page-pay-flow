@@ -10,7 +10,7 @@ import { formatAtomicAmount, priceForPages } from "@/lib/pagepay/pricing";
 import { getConfig } from "@/lib/pagepay/config.server";
 import { DocumentError, type ParsedDocument } from "@/lib/pagepay/document.server";
 import { readDocumentFromRequest } from "@/lib/pagepay/intake.server";
-import { SummarizerError, summarizeDocument } from "@/lib/pagepay/summarizer.server";
+import { SummarizerError, summarizeDocument, type ExtractionMode } from "@/lib/pagepay/summarizer.server";
 import { logRequest } from "@/lib/services/pagepayLogger.server";
 import { FacilitatorTimeoutError } from "@/lib/x402/facilitator.server";
 import {
@@ -32,6 +32,33 @@ function json(body: unknown, status: number, headers: Record<string, string> = {
 async function handleSummarize({ request }: { request: Request }): Promise<Response> {
   // 1. Document intake — bad input never reaches the payment layer.
   let doc: ParsedDocument;
+  let mode: ExtractionMode = "summary";
+
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    const cloned = request.clone();
+    try {
+      const form = await cloned.formData();
+      const rawMode = String(form.get("mode") ?? "summary");
+      if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+        mode = rawMode;
+      }
+    } catch {
+      // Ignore formdata parse error, readDocumentFromRequest will handle error
+    }
+  } else {
+    const cloned = request.clone();
+    try {
+      const payload = (await cloned.json()) as Record<string, unknown>;
+      const rawMode = String(payload["mode"] ?? "summary");
+      if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+        mode = rawMode;
+      }
+    } catch {
+      // Ignore JSON parse error, readDocumentFromRequest will handle error
+    }
+  }
+
   try {
     doc = await readDocumentFromRequest(request);
   } catch (error) {
@@ -200,7 +227,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
 
   // 4. Paid work.
   try {
-    const summary = await summarizeDocument(doc.text, doc.pages, request);
+    const summary = await summarizeDocument(doc.text, doc.pages, request, mode);
     logRequest({
       route: ROUTE,
       pages: doc.pages,
@@ -213,6 +240,7 @@ async function handleSummarize({ request }: { request: Request }): Promise<Respo
     return json(
       {
         summary,
+        mode,
         pages: doc.pages,
         pricePaid: priceQuoted,
         amountPaid: `${formatAtomicAmount(amountAtomic)} (asset ${paymentRequirements.asset})`,

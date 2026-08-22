@@ -24,12 +24,13 @@ import { Route as ApiMetricsRouteImport } from './routes/api/metrics'
 import { Route as ApiPriceRouteImport } from './routes/api/price'
 import { Route as ApiReceiptRouteImport } from './routes/api/receipt'
 import { Route as ApiSummarizeRouteImport } from './routes/api/summarize'
+import { Route as ApiToolsRouteImport } from './routes/api/tools'
 import { Route as ApiX402DemoRouteImport } from './routes/api/x402-demo'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsAlgorandRouteImport } from './routes/docs/algorand'
 import { Route as DocsX402RouteImport } from './routes/docs/x402'
 import { Route as ReceiptTxIdRouteImport } from './routes/receipt/$txId'
-import { Route as ApiSummarizeChunkRouteImport } from './routes/api/summarize/chunk'
+import { Route as ApiSummarizeRangeRouteImport } from './routes/api/summarize/range'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -106,6 +107,11 @@ const ApiSummarizeRoute = ApiSummarizeRouteImport.update({
   path: '/api/summarize',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiToolsRoute = ApiToolsRouteImport.update({
+  id: '/api/tools',
+  path: '/api/tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiX402DemoRoute = ApiX402DemoRouteImport.update({
   id: '/api/x402-demo',
   path: '/api/x402-demo',
@@ -131,9 +137,9 @@ const ReceiptTxIdRoute = ReceiptTxIdRouteImport.update({
   path: '/receipt/$txId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSummarizeChunkRoute = ApiSummarizeChunkRouteImport.update({
-  id: '/chunk',
-  path: '/chunk',
+const ApiSummarizeRangeRoute = ApiSummarizeRangeRouteImport.update({
+  id: '/range',
+  path: '/range',
   getParentRoute: () => ApiSummarizeRoute,
 } as any)
 
@@ -153,12 +159,13 @@ export interface FileRoutesByFullPath {
   '/api/price': typeof ApiPriceRoute
   '/api/receipt': typeof ApiReceiptRoute
   '/api/summarize': typeof ApiSummarizeRouteWithChildren
+  '/api/tools': typeof ApiToolsRoute
   '/api/x402-demo': typeof ApiX402DemoRoute
   '/docs/algorand': typeof DocsAlgorandRoute
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs/': typeof DocsIndexRoute
-  '/api/summarize/chunk': typeof ApiSummarizeChunkRoute
+  '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -176,12 +183,13 @@ export interface FileRoutesByTo {
   '/api/price': typeof ApiPriceRoute
   '/api/receipt': typeof ApiReceiptRoute
   '/api/summarize': typeof ApiSummarizeRouteWithChildren
+  '/api/tools': typeof ApiToolsRoute
   '/api/x402-demo': typeof ApiX402DemoRoute
   '/docs/algorand': typeof DocsAlgorandRoute
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs': typeof DocsIndexRoute
-  '/api/summarize/chunk': typeof ApiSummarizeChunkRoute
+  '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -200,12 +208,13 @@ export interface FileRoutesById {
   '/api/price': typeof ApiPriceRoute
   '/api/receipt': typeof ApiReceiptRoute
   '/api/summarize': typeof ApiSummarizeRouteWithChildren
+  '/api/tools': typeof ApiToolsRoute
   '/api/x402-demo': typeof ApiX402DemoRoute
   '/docs/algorand': typeof DocsAlgorandRoute
   '/docs/x402': typeof DocsX402Route
   '/receipt/$txId': typeof ReceiptTxIdRoute
   '/docs/': typeof DocsIndexRoute
-  '/api/summarize/chunk': typeof ApiSummarizeChunkRoute
+  '/api/summarize/range': typeof ApiSummarizeRangeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -225,12 +234,13 @@ export interface FileRouteTypes {
     | '/api/price'
     | '/api/receipt'
     | '/api/summarize'
+    | '/api/tools'
     | '/api/x402-demo'
     | '/docs/algorand'
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs/'
-    | '/api/summarize/chunk'
+    | '/api/summarize/range'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -248,12 +258,13 @@ export interface FileRouteTypes {
     | '/api/price'
     | '/api/receipt'
     | '/api/summarize'
+    | '/api/tools'
     | '/api/x402-demo'
     | '/docs/algorand'
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs'
-    | '/api/summarize/chunk'
+    | '/api/summarize/range'
   id:
     | '__root__'
     | '/'
@@ -271,12 +282,13 @@ export interface FileRouteTypes {
     | '/api/price'
     | '/api/receipt'
     | '/api/summarize'
+    | '/api/tools'
     | '/api/x402-demo'
     | '/docs/algorand'
     | '/docs/x402'
     | '/receipt/$txId'
     | '/docs/'
-    | '/api/summarize/chunk'
+    | '/api/summarize/range'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -295,6 +307,7 @@ export interface RootRouteChildren {
   ApiPriceRoute: typeof ApiPriceRoute
   ApiReceiptRoute: typeof ApiReceiptRoute
   ApiSummarizeRoute: typeof ApiSummarizeRouteWithChildren
+  ApiToolsRoute: typeof ApiToolsRoute
   ApiX402DemoRoute: typeof ApiX402DemoRoute
   DocsAlgorandRoute: typeof DocsAlgorandRoute
   DocsX402Route: typeof DocsX402Route
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSummarizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tools': {
+      id: '/api/tools'
+      path: '/api/tools'
+      fullPath: '/api/tools'
+      preLoaderRoute: typeof ApiToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/x402-demo': {
       id: '/api/x402-demo'
       path: '/api/x402-demo'
@@ -444,22 +464,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptTxIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/summarize/chunk': {
-      id: '/api/summarize/chunk'
-      path: '/chunk'
-      fullPath: '/api/summarize/chunk'
-      preLoaderRoute: typeof ApiSummarizeChunkRouteImport
+    '/api/summarize/range': {
+      id: '/api/summarize/range'
+      path: '/range'
+      fullPath: '/api/summarize/range'
+      preLoaderRoute: typeof ApiSummarizeRangeRouteImport
       parentRoute: typeof ApiSummarizeRoute
     }
   }
 }
 
 interface ApiSummarizeRouteChildren {
-  ApiSummarizeChunkRoute: typeof ApiSummarizeChunkRoute
+  ApiSummarizeRangeRoute: typeof ApiSummarizeRangeRoute
 }
 
 const ApiSummarizeRouteChildren: ApiSummarizeRouteChildren = {
-  ApiSummarizeChunkRoute: ApiSummarizeChunkRoute,
+  ApiSummarizeRangeRoute: ApiSummarizeRangeRoute,
 }
 
 const ApiSummarizeRouteWithChildren = ApiSummarizeRoute._addFileChildren(
@@ -482,6 +502,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPriceRoute: ApiPriceRoute,
   ApiReceiptRoute: ApiReceiptRoute,
   ApiSummarizeRoute: ApiSummarizeRouteWithChildren,
+  ApiToolsRoute: ApiToolsRoute,
   ApiX402DemoRoute: ApiX402DemoRoute,
   DocsAlgorandRoute: DocsAlgorandRoute,
   DocsX402Route: DocsX402Route,

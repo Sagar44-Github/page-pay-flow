@@ -15,7 +15,7 @@ import { priceForPages } from "@/lib/pagepay/pricing";
 import { ResilientFacilitatorClient } from "./facilitator.server";
 
 export const SUMMARIZE_ROUTE = "POST /api/summarize";
-export const CHUNK_ROUTE = "POST /api/summarize/chunk";
+export const RANGE_ROUTE = "POST /api/summarize/range";
 /** Compiled default; the live value is getConfig().network. */
 export const X402_NETWORK = ALGORAND_TESTNET_CAIP2;
 
@@ -30,9 +30,9 @@ function readPageCount(context: HTTPRequestContext): number {
   return Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 1;
 }
 
-function readChunkPageCount(context: HTTPRequestContext): number {
-  const body = context.adapter.getBody?.() as { chunkPages?: number } | undefined;
-  const pages = Number(body?.chunkPages ?? 1);
+function readRangePageCount(context: HTTPRequestContext): number {
+  const body = context.adapter.getBody?.() as { rangePages?: number } | undefined;
+  const pages = Number(body?.rangePages ?? 1);
   return Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 1;
 }
 
@@ -75,8 +75,8 @@ function buildRoutes(): RoutesConfig {
         },
       }),
     },
-    [CHUNK_ROUTE]: {
-      description: "Pay-per-chunk AI document summary (one chunk at a time)",
+    [RANGE_ROUTE]: {
+      description: "Pay-per-range AI document summary (caller picks page range)",
       mimeType: "application/json",
       accepts: {
         scheme: "exact",
@@ -86,16 +86,16 @@ function buildRoutes(): RoutesConfig {
           if (!payTo) throw new MissingPayToError();
           return payTo;
         },
-        price: (context) => priceForPages(readChunkPageCount(context), getConfig().pricePerPageUsd),
+        price: (context) => priceForPages(readRangePageCount(context), getConfig().pricePerPageUsd),
         maxTimeoutSeconds: 120,
       },
       unpaidResponseBody: (context) => {
-        const pages = readChunkPageCount(context);
+        const pages = readRangePageCount(context);
         return {
           contentType: "application/json",
           body: {
             error: "Payment required",
-            reason: `This chunk covers ${pages} page(s) at $0.01 per page. Attach an X-PAYMENT header signed for one of the payment requirements above.`,
+            reason: `This range covers ${pages} page(s) at $0.01 per page. Attach an X-PAYMENT header signed for one of the payment requirements above.`,
             pagesQuoted: pages,
             priceQuoted: priceForPages(pages),
           },
@@ -106,7 +106,7 @@ function buildRoutes(): RoutesConfig {
         body: {
           error: "Payment failed",
           reason: settleResult.errorMessage ?? settleResult.errorReason ?? "settlement rejected",
-          pagesQuoted: readChunkPageCount(context),
+          pagesQuoted: readRangePageCount(context),
         },
       }),
     },

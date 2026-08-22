@@ -1,31 +1,34 @@
 /**
- * POST /api/summarize/chunk — x402-gated, pay-per-CHUNK AI document summarization.
+ * POST /api/summarize/range — x402-gated, pay-per-RANGE AI document summarization.
+ *
+ * The caller chooses exactly which pages to summarize (1-indexed, inclusive)
+ * and pays only for that range: price = (endPage - startPage + 1) × per-page rate.
  *
  * Flow:
- *   1. First call: upload document + chunkIndex=0 → parse, cache, quote chunk price
- *   2. Subsequent calls: sessionId + chunkIndex → retrieve from cache, quote chunk price
- *   3. x402 verify/settle for THIS chunk's pages only
- *   4. Summarize only the chunk's page range
- *   5. Return chunk summary + metadata (chunkIndex, totalChunks, hasMore, sessionId)
+ *   1. Parse document (upload or cached session)
+ *   2. Validate startPage / endPage against the document's actual page count
+ *   3. x402 verify/settle for the range's page count only
+ *   4. Summarize only the requested pages
+ *   5. Return summary + metadata
  */
 import { createFileRoute } from "@tanstack/react-router";
 
-import { chunkInfoForDocument, formatAtomicAmount, priceForPages } from "@/lib/pagepay/pricing";
+import { formatAtomicAmount, priceForPages, validatePageRange } from "@/lib/pagepay/pricing";
 import { getConfig } from "@/lib/pagepay/config.server";
 import { DocumentError, type ParsedDocument } from "@/lib/pagepay/document.server";
 import { readDocumentFromRequest } from "@/lib/pagepay/intake.server";
 import { cacheDocument, getCachedDocument } from "@/lib/pagepay/documentCache.server";
-import { SummarizerError, summarizeChunk } from "@/lib/pagepay/summarizer.server";
+import { SummarizerError, summarizeRange, type ExtractionMode } from "@/lib/pagepay/summarizer.server";
 import { logRequest } from "@/lib/services/pagepayLogger.server";
 import { FacilitatorTimeoutError } from "@/lib/x402/facilitator.server";
 import {
   MissingPayToError,
-  CHUNK_ROUTE,
+  RANGE_ROUTE,
   createRequestContext,
   getResourceServer,
 } from "@/lib/x402/routeConfig.server";
 
-const ROUTE = CHUNK_ROUTE;
+const ROUTE = RANGE_ROUTE;
 
 function json(body: unknown, status: number, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -34,19 +37,25 @@ function json(body: unknown, status: number, headers: Record<string, string> = {
   });
 }
 
-async function handleChunkSummarize({ request }: { request: Request }): Promise<Response> {
+async function handleRangeSummarize({ request }: { request: Request }): Promise<Response> {
   // 1. Resolve document: either from cache (sessionId) or fresh upload.
   let doc: ParsedDocument;
   let sessionId: string;
-  let chunkIndex: number;
+  let startPage: number;
+  let endPage: number;
+  let mode: ExtractionMode = "summary";
 
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {
-    // First-call or re-upload: parse the document, cache it.
     const cloned = request.clone();
     const form = await cloned.formData();
-    chunkIndex = Number(form.get("chunkIndex") ?? 0);
+    startPage = Number(form.get("startPage") ?? 1);
+    endPage = Number(form.get("endPage") ?? 1);
+    const rawMode = String(form.get("mode") ?? "summary");
+    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+      mode = rawMode;
+    }
     const existingSessionId = form.get("sessionId");
 
     if (existingSessionId && typeof existingSessionId === "string") {
@@ -55,7 +64,6 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
         doc = cached;
         sessionId = existingSessionId;
       } else {
-        // Session expired — re-parse
         try {
           doc = await readDocumentFromRequest(request);
         } catch (error) {
@@ -74,7 +82,6 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
       sessionId = cacheDocument(doc);
     }
   } else {
-    // JSON body: sessionId + chunkIndex (or text + chunkIndex for first call)
     let payload: Record<string, unknown>;
     try {
       payload = (await request.json()) as Record<string, unknown>;
@@ -82,7 +89,12 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
       return json({ error: "Bad request", reason: "Request body must be JSON or multipart/form-data." }, 400);
     }
 
-    chunkIndex = Number(payload["chunkIndex"] ?? 0);
+    startPage = Number(payload["startPage"] ?? 1);
+    endPage = Number(payload["endPage"] ?? 1);
+    const rawMode = String(payload["mode"] ?? "summary");
+    if (rawMode === "action_items" || rawMode === "key_risks" || rawMode === "summary") {
+      mode = rawMode;
+    }
     const existingSessionId = payload["sessionId"] as string | undefined;
 
     if (existingSessionId) {
@@ -106,17 +118,22 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
       sessionId = cacheDocument(doc);
     } else {
       return json(
-        { error: "Bad request", reason: "Provide a `sessionId` or upload a document." },
+        { error: "Bad request", reason: "Provide a `sessionId` or upload a document, plus `startPage` and `endPage`." },
         400,
       );
     }
   }
 
-  // 2. Compute chunk info.
-  const chunk = chunkInfoForDocument(doc.pages, chunkIndex);
-  const priceQuoted = priceForPages(chunk.chunkPages, getConfig().pricePerPageUsd);
+  // 2. Validate the page range.
+  const rangeError = validatePageRange(startPage, endPage, doc.pages);
+  if (rangeError) {
+    return json({ error: "Bad request", reason: rangeError, totalPages: doc.pages }, 400);
+  }
 
-  // 3. x402: verify payment for THIS chunk's page count.
+  const rangePages = endPage - startPage + 1;
+  const priceQuoted = priceForPages(rangePages, getConfig().pricePerPageUsd);
+
+  // 3. x402: verify payment for this range's page count.
   let server;
   try {
     server = await getResourceServer();
@@ -124,7 +141,7 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
     if (error instanceof MissingPayToError) {
       logRequest({
         route: ROUTE,
-        pages: chunk.chunkPages,
+        pages: rangePages,
         price: priceQuoted,
         paymentStatus: "failed",
         outcome: "gateway_error",
@@ -138,7 +155,7 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
         : `Facilitator unavailable: ${error instanceof Error ? error.message : String(error)}`;
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: "gateway_timeout",
       outcome: "gateway_error",
@@ -147,25 +164,26 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
     return json({ error: "Payment gateway unavailable", reason, retryable: true }, 504);
   }
 
-  const context = createRequestContext(request, { chunkPages: chunk.chunkPages });
+  const context = createRequestContext(request, { rangePages });
 
   let processed;
   try {
-    console.log("[pagepay:chunk] verifying payment", {
+    console.log("[pagepay:range] verifying payment", {
       hasPaymentSignature: !!request.headers.get("payment-signature"),
-      chunkIndex: chunk.chunkIndex,
-      chunkPages: chunk.chunkPages,
+      startPage,
+      endPage,
+      rangePages,
       priceQuoted,
     });
     processed = await server.processHTTPRequest(context);
-    console.log("[pagepay:chunk] verify result", processed.type);
+    console.log("[pagepay:range] verify result", processed.type);
   } catch (error) {
     const timedOut = error instanceof FacilitatorTimeoutError;
     const misconfigured = error instanceof MissingPayToError;
     const reason = error instanceof Error ? error.message : String(error);
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: timedOut ? "gateway_timeout" : "failed",
       outcome: timedOut || misconfigured ? "gateway_error" : "payment_failed",
@@ -181,7 +199,7 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
     const { status, headers, body } = processed.response;
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: status === 402 ? "required" : "failed",
       outcome: status === 402 ? "payment_required" : "payment_failed",
@@ -195,7 +213,7 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
   if (processed.type === "no-payment-required") {
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: "failed",
       outcome: "gateway_error",
@@ -214,10 +232,11 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
   // 4. Settle on-chain.
   let settlement;
   try {
-    console.log("[pagepay:chunk] settling payment", {
+    console.log("[pagepay:range] settling payment", {
       payer,
       amountAtomic,
-      chunkIndex: chunk.chunkIndex,
+      startPage,
+      endPage,
     });
     settlement = await server.processSettlement(
       paymentPayload,
@@ -225,13 +244,13 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
       declaredExtensions,
       { request: context },
     );
-    console.log("[pagepay:chunk] settlement result", JSON.stringify(settlement, null, 2));
+    console.log("[pagepay:range] settlement result", JSON.stringify(settlement, null, 2));
   } catch (error) {
     const timedOut = error instanceof FacilitatorTimeoutError;
     const reason = error instanceof Error ? error.message : String(error);
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: timedOut ? "gateway_timeout" : "failed",
       outcome: timedOut ? "gateway_error" : "payment_failed",
@@ -247,7 +266,7 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
     const reason = settlement.errorMessage ?? settlement.errorReason;
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: "failed",
       outcome: "payment_failed",
@@ -263,25 +282,25 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
 
   const txId = settlement.transaction;
 
-  // 5. Summarize this chunk's page range only.
+  // 5. Summarize only the requested page range.
+  // pageTexts is 0-indexed; startPage/endPage are 1-indexed inclusive.
   try {
-    const chunkText = doc.pageTexts
-      .slice(chunk.startPage, chunk.endPage)
+    const rangeText = doc.pageTexts
+      .slice(startPage - 1, endPage)
       .join("\n\n");
 
-    const summary = await summarizeChunk(
-      chunkText,
-      chunk.chunkIndex,
-      chunk.totalChunks,
-      chunk.chunkPages,
-      chunk.startPage,
-      chunk.endPage,
+    const summary = await summarizeRange(
+      rangeText,
+      startPage,
+      endPage,
+      doc.pages,
       request,
+      mode,
     );
 
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: "settled",
       outcome: "summarized",
@@ -292,11 +311,11 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
     return json(
       {
         summary,
-        chunkIndex: chunk.chunkIndex,
-        totalChunks: chunk.totalChunks,
-        chunkPages: chunk.chunkPages,
+        mode,
+        startPage,
+        endPage,
+        pages: rangePages,
         totalPages: doc.pages,
-        hasMore: chunk.hasMore,
         sessionId,
         pricePaid: priceQuoted,
         amountPaid: `${formatAtomicAmount(amountAtomic)} (asset ${paymentRequirements.asset})`,
@@ -310,10 +329,10 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
       settlement.headers,
     );
   } catch (error) {
-    const reason = error instanceof SummarizerError ? error.message : "Chunk summarization failed.";
+    const reason = error instanceof SummarizerError ? error.message : "Range summarization failed.";
     logRequest({
       route: ROUTE,
-      pages: chunk.chunkPages,
+      pages: rangePages,
       price: priceQuoted,
       paymentStatus: "settled",
       outcome: "paid_unfulfilled",
@@ -323,11 +342,11 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
     });
     return json(
       {
-        error: "Chunk summarization failed after payment",
+        error: "Range summarization failed after payment",
         reason,
         paymentReference: { txId, network: paymentRequirements.network, amount: amountAtomic },
         support:
-          "Keep this payment reference — the payment settled but the chunk summary could not be produced.",
+          "Keep this payment reference — the payment settled but the summary could not be produced.",
       },
       500,
       settlement.headers,
@@ -335,10 +354,10 @@ async function handleChunkSummarize({ request }: { request: Request }): Promise<
   }
 }
 
-export const Route = createFileRoute("/api/summarize/chunk")({
+export const Route = createFileRoute("/api/summarize/range")({
   server: {
     handlers: {
-      POST: handleChunkSummarize,
+      POST: handleRangeSummarize,
     },
   },
 });
