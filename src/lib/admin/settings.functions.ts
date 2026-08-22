@@ -9,6 +9,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { useSession } from "@tanstack/react-start/server";
 import { createHash, timingSafeEqual } from "node:crypto";
 
+import { env, envOptional } from "@/lib/env";
+
 export interface AdminSettings {
   payTo: string | null;
   pricePerPageUsd: number;
@@ -26,8 +28,7 @@ interface AdminSession {
 function sessionConfig() {
   return {
     password:
-      process.env["SESSION_SECRET"] ||
-      "pagepay-default-secure-session-secret-key-32-chars-minimum",
+      env("SESSION_SECRET", "pagepay-default-secure-session-secret-key-32-chars-minimum"),
     name: "pagepay-admin",
     maxAge: 60 * 60 * 8,
     cookie: { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" },
@@ -62,7 +63,7 @@ export const adminStatus = createServerFn({ method: "GET" }).handler(async () =>
 export const adminUnlock = createServerFn({ method: "POST" })
   .inputValidator((data: { password: string }) => data)
   .handler(async ({ data }) => {
-    const expected = process.env["ADMIN_PASSWORD"];
+    const expected = envOptional("ADMIN_PASSWORD");
     if (!expected) {
       return { ok: false as const, error: "ADMIN_PASSWORD is not configured on the server." };
     }

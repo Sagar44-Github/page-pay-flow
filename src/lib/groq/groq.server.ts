@@ -1,6 +1,7 @@
 /**
  * Groq (OpenAI-compatible) helper. Server-only: GROQ_API_KEY never reaches the client.
  */
+import { envOptional } from "@/lib/env";
 
 export const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 export const GROQ_DEFAULT_MODEL = "openai/gpt-oss-20b";
@@ -35,7 +36,7 @@ export async function groqChat(options: {
   temperature?: number;
   maxTokens?: number;
 }): Promise<GroqCompletion> {
-  const apiKey = process.env["GROQ_API_KEY"];
+  const apiKey = envOptional("GROQ_API_KEY");
   if (!apiKey) throw new GroqError("GROQ_API_KEY is not configured.", 500);
 
   const model =

@@ -9,6 +9,7 @@
  */
 import { ALGORAND_TESTNET_CAIP2 } from "@x402-avm/avm";
 
+import { env, envNumber } from "@/lib/env";
 import { PRICE_PER_PAGE_USD } from "@/lib/pagepay/pricing";
 
 export const DEFAULT_FACILITATOR_URL = "https://facilitator.goplausible.xyz";
@@ -28,13 +29,12 @@ let overrides: ConfigPatch = {};
 export const DEFAULT_PAY_TO = "UPRVZO4TROKAOI2KBRWKVKQUWXNV4DQ4NDL5PEARA4IVZ73DDROT2ATSV4";
 
 function fromEnv(): PagePayConfig {
-  const envPrice = Number(process.env["PRICE_PER_PAGE_USD"]);
+  const envPrice = envNumber("PRICE_PER_PAGE_USD", PRICE_PER_PAGE_USD);
   return {
-    payTo: process.env["RESOURCE_PAY_TO"] || DEFAULT_PAY_TO,
-    pricePerPageUsd: Number.isFinite(envPrice) && envPrice > 0 ? envPrice : PRICE_PER_PAGE_USD,
-    facilitatorUrl: process.env["FACILITATOR_URL"] ?? DEFAULT_FACILITATOR_URL,
-    network:
-      (process.env["X402_NETWORK"] as `${string}:${string}` | undefined) ?? ALGORAND_TESTNET_CAIP2,
+    payTo: env("RESOURCE_PAY_TO", DEFAULT_PAY_TO),
+    pricePerPageUsd: envPrice > 0 ? envPrice : PRICE_PER_PAGE_USD,
+    facilitatorUrl: env("FACILITATOR_URL", DEFAULT_FACILITATOR_URL),
+    network: (env("X402_NETWORK", ALGORAND_TESTNET_CAIP2) as `${string}:${string}`) ?? ALGORAND_TESTNET_CAIP2,
   };
 }
 

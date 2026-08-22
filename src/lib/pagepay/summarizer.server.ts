@@ -5,6 +5,7 @@
 import { streamText } from "ai";
 
 import { createLovableAiGatewayProvider, getLovableAiGatewayRunId } from "@/lib/ai-gateway.server";
+import { envOptional } from "@/lib/env";
 import { groqChat } from "@/lib/groq/groq.server";
 
 export type ExtractionMode = "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist";
@@ -122,8 +123,8 @@ export async function summarizeDocument(
   request: Request,
   mode: ExtractionMode = "summary",
 ): Promise<string> {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const groqKey = process.env["GROQ_API_KEY"];
+  const lovableKey = envOptional("LOVABLE_API_KEY");
+  const groqKey = envOptional("GROQ_API_KEY");
   if (!lovableKey && !groqKey) {
     throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
   }
@@ -169,8 +170,8 @@ export async function summarizePageRange(
   const promptConfig = RANGE_PROMPTS[mode] ?? RANGE_PROMPTS.summary;
   const prompt = `${promptConfig.userLabel} (Pages ${startPage} through ${endPage}, ${pages} page${pages === 1 ? "" : "s"} total):\n\n${text}`;
 
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const groqKey = process.env["GROQ_API_KEY"];
+  const lovableKey = envOptional("LOVABLE_API_KEY");
+  const groqKey = envOptional("GROQ_API_KEY");
   if (!lovableKey && !groqKey) {
     throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
   }
@@ -211,8 +212,8 @@ export async function compareDocuments(
   pagesB: number,
   request: Request,
 ): Promise<string> {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const groqKey = process.env["GROQ_API_KEY"];
+  const lovableKey = envOptional("LOVABLE_API_KEY");
+  const groqKey = envOptional("GROQ_API_KEY");
   if (!lovableKey && !groqKey) {
     throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
   }
