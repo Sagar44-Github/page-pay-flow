@@ -210,7 +210,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet }) {
   }
 
   async function handlePayAndSummarize() {
-    if (!wallet.isConnected) {
+    if (!wallet.signer || !wallet.address) {
       setError({
         message: "Connect your Algorand Pera Wallet first to sign the x402 USDC payment.",
         action: "connect",

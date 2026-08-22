@@ -67,13 +67,22 @@ interface RangeResult {
 
 interface Props {
   wallet: PeraWallet;
-  totalPages: number;
-  file: File | null;
-  text: string;
-  mode?: "summary" | "action_items" | "key_risks" | "compliance_check";
+  totalPages?: number;
+  file?: File | null;
+  text?: string;
+  defaultMode?: "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist";
+  mode?: "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist";
 }
 
-export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: Props) {
+export function RangeDemo({
+  wallet,
+  totalPages = 0,
+  file = null,
+  text = "",
+  defaultMode = "summary",
+  mode,
+}: Props) {
+  const effectiveMode = mode ?? defaultMode;
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(totalPages || 1);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -82,7 +91,7 @@ export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: 
   const [phase, setPhase] = useState<PaymentPhase | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
 
-  const hasDoc = Boolean(file) || text.trim().length > 0;
+  const hasDoc = Boolean(file) || (text ?? "").trim().length > 0;
   const isMultiPage = totalPages > 1;
   const effectiveTotalPages = totalPages > 0 ? totalPages : 1;
 
@@ -94,277 +103,178 @@ export function RangeDemo({ wallet, totalPages, file, text, mode = "summary" }: 
 
   const rangeValid = isMultiPage && hasDoc && clampedStart >= 1 && clampedEnd <= effectiveTotalPages && clampedStart <= clampedEnd;
 
-  function fail(next: FriendlyError) {
-    setError(next);
-  }
-
   async function handleSummarizeRange() {
-    setError(null);
-    setPhase(null);
-
-    if (!wallet.signer) {
-      fail({ message: "Connect Pera Wallet in the header first.", action: "connect" });
-      return;
-    }
-    if (!rangeValid) {
-      fail({ message: "Upload a document with more than 1 page to summarize a range." });
+    if (!rangeValid) return;
+    if (!wallet.isConnected) {
+      setError({ message: "Connect Pera Wallet to pay for this range.", action: "connect" });
       return;
     }
 
     setRunning(true);
+    setError(null);
+    setPhase("requesting_quote");
+
     try {
-      let init: RequestInit;
-      if (sessionId) {
-        init = {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sessionId, startPage: clampedStart, endPage: clampedEnd, mode }),
-        };
-      } else if (file) {
+      let body: FormData | string;
+      const headers: Record<string, string> = {};
+
+      if (file) {
         const form = new FormData();
-        form.set("file", file);
-        form.set("startPage", String(clampedStart));
-        form.set("endPage", String(clampedEnd));
-        form.set("mode", mode);
-        init = { method: "POST", body: form };
+        form.append("file", file);
+        form.append("startPage", String(clampedStart));
+        form.append("endPage", String(clampedEnd));
+        form.append("mode", effectiveMode);
+        if (sessionId) form.append("sessionId", sessionId);
+        body = form;
       } else {
-        init = {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text, startPage: clampedStart, endPage: clampedEnd, mode }),
-        };
+        headers["content-type"] = "application/json";
+        body = JSON.stringify({
+          text,
+          startPage: clampedStart,
+          endPage: clampedEnd,
+          mode: effectiveMode,
+          ...(sessionId ? { sessionId } : {}),
+        });
       }
 
-      const result = await payAndFetch("/api/summarize/range", init, wallet.signer, {
-        expectedPages: rangePages,
-        onPhase: setPhase,
-      });
+      setPhase("signing_payment");
+      const result = await payAndFetch(
+        "/api/summarize/range",
+        { method: "POST", headers, body },
+        wallet.getSigner(),
+        (p) => setPhase(p)
+      );
 
-      if (!result.ok) {
-        console.error("[pagepay:range] payment failed", result.failureCode, result.error);
-        const friendly = result.failureCode ? FAILURE_COPY[result.failureCode] : undefined;
-        fail(friendly ?? { message: "The payment couldn't be completed." });
+      if (!result.ok || !result.result) {
+        setPhase(null);
+        if (result.failureCode) {
+          setError(FAILURE_COPY[result.failureCode] ?? { message: result.error ?? "Range failed." });
+        } else {
+          setError({ message: result.error ?? "Range request failed." });
+        }
         return;
       }
 
-      const data = result.result as Record<string, unknown>;
-      const resMode = String(data["mode"] ?? mode);
-      const modeLabel = resMode === "action_items" ? "Action Items" : resMode === "key_risks" ? "Key Risks" : "Summary";
-      const rangeResult: RangeResult = {
-        label: `Pages ${data["startPage"]}–${data["endPage"]} · ${modeLabel}`,
-        summary: String(data["summary"] ?? ""),
-        startPage: Number(data["startPage"]),
-        endPage: Number(data["endPage"]),
-        pages: Number(data["pages"]),
-        pricePaid: String(data["pricePaid"] ?? ""),
-        amountPaid: String(data["amountPaid"] ?? ""),
-        txId: String(data["txId"] ?? ""),
-        explorer: String(data["explorer"] ?? ""),
+      setPhase("complete");
+      const res = result.result as Partial<RangeResult> & { sessionId?: string };
+      if (res.sessionId) setSessionId(res.sessionId);
+
+      const entry: RangeResult = {
+        label: `Pages ${clampedStart}–${clampedEnd} of ${effectiveTotalPages}`,
+        summary: res.summary ?? "",
+        startPage: clampedStart,
+        endPage: clampedEnd,
+        pages: res.pages ?? rangePages,
+        pricePaid: res.pricePaid ?? rangePrice,
+        amountPaid: res.amountPaid ?? "",
+        txId: res.txId ?? "",
+        explorer: res.explorer ?? "",
       };
-      setResults((prev) => [...prev, rangeResult]);
-      if (data["sessionId"]) {
-        setSessionId(data["sessionId"] as string);
-      }
-    } catch (runError) {
-      console.error("[pagepay:range] unexpected error", runError);
-      setPhase("failed");
-      fail({ message: "An unexpected error occurred. Check the browser console." });
+
+      setResults((prev) => [entry, ...prev]);
+    } catch (err) {
+      setPhase(null);
+      setError({ message: err instanceof Error ? err.message : String(err) });
     } finally {
       setRunning(false);
     }
   }
 
-  const PHASE_LABEL: Record<PaymentPhase, string> = {
-    quoting: "requesting 402 quote",
-    awaiting_signature: "awaiting signature in Pera",
-    submitted: "payment submitted",
-    verifying: "verifying settlement",
-    settled: "settled",
-    failed: "failed",
-  };
-
   return (
-    <div className="space-y-4">
-      {/* ── Integrated Range Selector Box ── */}
-      <div className="rounded-xl border border-border/80 bg-card/60 p-4 transition-all">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AnimatePresence mode="wait">
-              {isMultiPage ? (
-                <motion.span
-                  key="unlocked-icon"
-                  initial={{ scale: 0.7, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.7, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-primary font-mono"
-                >
-                  <Unlock className="size-4 text-primary" />
-                  <span>PAGE RANGE SELECTION</span>
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="locked-icon"
-                  initial={{ scale: 0.7, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.7, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground/80 font-mono"
-                >
-                  <Lock className="size-4 text-muted-foreground/70" />
-                  <span>PAGE RANGE SELECTION</span>
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <span className="font-mono text-[11px] text-muted-foreground">
-            {totalPages > 0 ? `${totalPages} total pages` : "Single-page mode"}
+    <div className="rounded-xl border border-border bg-card p-4 transition-all">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {isMultiPage ? (
+            <Unlock className="size-4 text-emerald-400" />
+          ) : (
+            <Lock className="size-4 text-muted-foreground/60" />
+          )}
+          <span className="font-mono text-xs font-semibold text-card-foreground">
+            Optional Page Range Selection
           </span>
         </div>
-
-        <AnimatePresence mode="wait">
-          {!isMultiPage ? (
-            <motion.div
-              key="locked-state"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25 }}
-              className="mt-3 flex items-center gap-2.5 rounded-lg border border-dashed border-border/70 bg-muted/20 px-3.5 py-3 text-xs text-muted-foreground font-mono"
-            >
-              <Lock className="size-4 shrink-0 text-muted-foreground/70" />
-              <span>
-                Unlocks for documents with more than 1 page.
-              </span>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="unlocked-state"
-              initial={{ opacity: 0, height: 0, filter: "blur(4px)" }}
-              animate={{ opacity: 1, height: "auto", filter: "blur(0px)" }}
-              exit={{ opacity: 0, height: 0, filter: "blur(4px)" }}
-              transition={{ duration: 0.3 }}
-              className="mt-4 space-y-4"
-            >
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <Label htmlFor="range-start" className="text-xs text-muted-foreground font-mono">
-                    From page
-                  </Label>
-                  <Input
-                    id="range-start"
-                    type="number"
-                    min={1}
-                    max={effectiveTotalPages}
-                    value={clampedStart}
-                    className="mt-1 font-mono text-xs"
-                    onChange={(e) => setStartPage(Number(e.target.value))}
-                  />
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="range-end" className="text-xs text-muted-foreground font-mono">
-                    To page
-                  </Label>
-                  <Input
-                    id="range-end"
-                    type="number"
-                    min={1}
-                    max={effectiveTotalPages}
-                    value={clampedEnd}
-                    className="mt-1 font-mono text-xs"
-                    onChange={(e) => setEndPage(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-background/50 p-2.5">
-                <Row label="Pages in range">{rangePages}</Row>
-                <Row label="Range price">
-                  <span className="font-semibold text-primary">{rangePrice}</span>
-                </Row>
-              </div>
-
-              {phase && (
-                <p className="font-mono text-[11px] text-muted-foreground">
-                  Status:{" "}
-                  <span className={phase === "failed" ? "text-destructive" : ""}>
-                    {PHASE_LABEL[phase]}
-                  </span>
-                </p>
-              )}
-
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full font-semibold"
-                disabled={running || !rangeValid}
-                onClick={() => void handleSummarizeRange()}
-              >
-                {running ? "Processing Range…" : `Summarize pages ${clampedStart}–${clampedEnd} (${rangePrice})`}
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {error && (
-          <div
-            className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-            role="alert"
-          >
-            <p>{error.message}</p>
-            {error.action === "connect" && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-2"
-                onClick={() => void wallet.connect()}
-              >
-                Connect Pera Wallet
-              </Button>
-            )}
-            {error.action === "fund" && (
-              <a
-                className="mt-2 inline-block font-mono text-[11px] underline underline-offset-2"
-                href={TESTNET_DISPENSER_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                open the Algorand testnet dispenser →
-              </a>
-            )}
-          </div>
-        )}
+        <span
+          className={`font-mono text-[10px] uppercase tracking-wider rounded px-2 py-0.5 ${
+            isMultiPage
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {isMultiPage ? "Unlocked" : "Locked (1 Page Doc)"}
+        </span>
       </div>
 
-      {/* ── Accumulated Range Summaries (if any) ── */}
-      {results.map((r, i) => (
-        <div key={`${r.startPage}-${r.endPage}-${i}`} className="rounded-xl border border-border bg-card p-4">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-            {r.label}
-          </h4>
-          <div className="mt-3 rounded-lg border border-border/60 bg-background/40 p-4">
-            <MarkdownContent>{r.summary}</MarkdownContent>
+      {!isMultiPage && (
+        <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+          Single page documents cover the full text automatically. Upload a multi-page PDF to select custom ranges.
+        </p>
+      )}
+
+      {isMultiPage && (
+        <div className="mt-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[10px] font-mono text-muted-foreground">Start Page</Label>
+              <Input
+                type="number"
+                min={1}
+                max={effectiveTotalPages}
+                value={startPage}
+                onChange={(e) => setStartPage(Number(e.target.value))}
+                className="mt-1 h-8 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <Label className="text-[10px] font-mono text-muted-foreground">End Page</Label>
+              <Input
+                type="number"
+                min={1}
+                max={effectiveTotalPages}
+                value={endPage}
+                onChange={(e) => setEndPage(Number(e.target.value))}
+                className="mt-1 h-8 font-mono text-xs"
+              />
+            </div>
           </div>
-          <div className="mt-3">
-            <Row label="Pages charged">{r.pages}</Row>
-            <Row label="Paid">{r.pricePaid}</Row>
-            <Row label="Transaction">
-              {r.explorer ? (
-                <Link
-                  to="/receipt/$txId"
-                  params={{ txId: r.txId }}
-                  className="text-primary underline-offset-2 hover:underline"
-                >
-                  {r.txId}
-                </Link>
-              ) : (
-                r.txId ?? "—"
-              )}
-            </Row>
+
+          <div className="flex items-center justify-between font-mono text-xs">
+            <span className="text-muted-foreground">Range Price:</span>
+            <span className="font-bold text-primary">{rangePrice}</span>
           </div>
+
+          <Button
+            size="sm"
+            disabled={!rangeValid || running}
+            onClick={() => void handleSummarizeRange()}
+            className="w-full text-xs font-mono"
+          >
+            {running ? "Processing Range..." : `Summarize Pages ${clampedStart}–${clampedEnd} (${rangePrice})`}
+          </Button>
+
+          {error && (
+            <div className="rounded border border-destructive/30 bg-destructive/10 p-2 font-mono text-[11px] text-destructive">
+              {error.message}
+            </div>
+          )}
+
+          {results.length > 0 && (
+            <div className="mt-3 space-y-2 pt-2 border-t border-border/40">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground block">
+                Range Results ({results.length})
+              </span>
+              {results.map((r, idx) => (
+                <div key={idx} className="rounded border border-border/60 bg-muted/20 p-2 font-mono text-xs space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-foreground">
+                    <span>{r.label}</span>
+                    <span className="text-primary">{r.pricePaid}</span>
+                  </div>
+                  <p className="text-muted-foreground text-[11px] line-clamp-3">{r.summary}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ))}
+      )}
     </div>
   );
 }

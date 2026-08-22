@@ -84,9 +84,9 @@ export interface AgentPolicyExecutionResult {
 /** Default permissive policy for fallback. */
 export const DEFAULT_AGENT_POLICY: AgentSpendPolicy = {
   maxPricePerRequestUsd: 0.10,
-  sessionBudgetUsd: 0.50,
-  allowedModes: ["summary", "action_items", "key_risks"],
-  allowedEndpoints: ["/api/summarize", "/api/summarize/range"],
+  sessionBudgetUsd: 1.00,
+  allowedModes: ["summary", "action_items", "key_risks", "compliance_check", "checklist"],
+  allowedEndpoints: ["/api/summarize", "/api/summarize/range", "/api/compare"],
 };
 
 /**

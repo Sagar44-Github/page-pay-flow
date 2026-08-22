@@ -230,10 +230,19 @@ export async function payAndFetch(
   const retryHeaders = new Headers(init.headers);
   for (const [key, value] of Object.entries(paymentHeaders)) retryHeaders.set(key, value);
 
+  let retryBody = init.body;
+  if (init.body instanceof FormData) {
+    const freshForm = new FormData();
+    for (const [k, v] of init.body.entries()) {
+      freshForm.append(k, v);
+    }
+    retryBody = freshForm;
+  }
+
   phase("submitted");
   let second: Response;
   try {
-    second = await fetch(url, { ...init, headers: retryHeaders });
+    second = await fetch(url, { ...init, headers: retryHeaders, body: retryBody });
   } catch (error) {
     phase("failed");
     return {
