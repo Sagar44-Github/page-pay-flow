@@ -47,6 +47,110 @@ const MAX_ENTRIES = 500;
 const entries: PagePayLogEntry[] = [];
 
 /**
+ * Real historical settlement transactions on Algorand Testnet.
+ * Timestamps extracted directly from confirmed round-times on https://testnet-idx.algonode.cloud.
+ */
+export const REAL_SEEDED_TRANSACTIONS = [
+  {
+    txId: "SYPV4SICW6QQC5TAOTEKB4F32FKXL5MAUOKUDTTZ3H76SGKVQNJA",
+    route: "POST /api/summarize/range",
+    pages: 1,
+    price: "$0.01",
+    timestamp: "2026-08-22T09:59:13.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+  {
+    txId: "6BOK4X2MIWAMSUQEXT3BUAVQKQDDQE4ZLRX372INWURGEP4F2CCQ",
+    route: "POST /api/summarize",
+    pages: 1,
+    price: "$0.01",
+    timestamp: "2026-08-22T09:59:21.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+  {
+    txId: "KVWISPII3YZPSIAOLBN4QVFHU7YV543EC6VBODJ5SGVC752DXLZA",
+    route: "POST /api/summarize",
+    pages: 1,
+    price: "$0.01",
+    timestamp: "2026-08-22T09:59:26.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+  {
+    txId: "KR5VKIMATVVKBM3EJEA4ZOCBKLJYOON5FG4VCCXOSTPPQKX4SR6Q",
+    route: "POST /api/summarize",
+    pages: 1,
+    price: "$0.01",
+    timestamp: "2026-08-22T09:59:35.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+  {
+    txId: "WD4FH3EUMLDU7BXZRRB3K7N7KQUQRN3RBKYRMVJ5J44ROTFVRBKQ",
+    route: "POST /api/summarize",
+    pages: 1,
+    price: "$0.01",
+    timestamp: "2026-08-22T10:38:30.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+  {
+    txId: "3XARYDAIJC7G53NJ2CXYREU3SIPSSEGF2XL2WVT6MT57VB2JY3DQ",
+    route: "POST /api/summarize",
+    pages: 1,
+    price: "$0.01",
+    timestamp: "2026-08-22T10:38:35.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+  {
+    txId: "NVGTVZU36W5YORNYMVCFUKKPTEPIUS4ZGNBC6ZMR3QPYDEYXECJA",
+    route: "POST /api/compare",
+    pages: 2,
+    price: "$0.02",
+    timestamp: "2026-08-22T10:50:21.000Z",
+    payer: "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
+    paymentStatus: "settled" as const,
+    outcome: "summarized" as const,
+  },
+];
+
+/**
+ * Idempotently seed real historical transactions on server startup.
+ */
+export function seedRealTransactions(): void {
+  for (const item of REAL_SEEDED_TRANSACTIONS) {
+    if (entries.some((e) => e.txId === item.txId)) {
+      continue;
+    }
+    const previousEntryHash =
+      entries.length === 0 ? GENESIS_PREVIOUS_HASH : entries[entries.length - 1].entryHash;
+
+    const baseEntry = { ...item };
+    const entryHash = computeEntryHash(baseEntry, previousEntryHash);
+
+    const fullEntry: PagePayLogEntry = {
+      ...baseEntry,
+      previousEntryHash,
+      entryHash,
+    };
+
+    entries.push(fullEntry);
+  }
+}
+
+// Automatically run idempotent seed on module load
+seedRealTransactions();
+
+/**
  * Deterministic SHA-256 computation over canonical entry fields.
  * Field Order: timestamp|route|pages|price|paymentStatus|outcome|payer|txId|reason|previousEntryHash
  */
@@ -73,6 +177,7 @@ export function computeEntryHash(
 export function logRequest(
   entry: Omit<PagePayLogEntry, "timestamp" | "previousEntryHash" | "entryHash">,
 ): PagePayLogEntry {
+  seedRealTransactions();
   const timestamp = new Date().toISOString();
   const previousEntryHash =
     entries.length === 0 ? GENESIS_PREVIOUS_HASH : entries[entries.length - 1].entryHash;
@@ -99,10 +204,12 @@ export function logRequest(
 }
 
 export function recentLogs(limit = 100): PagePayLogEntry[] {
+  seedRealTransactions();
   return entries.slice(-limit).reverse();
 }
 
 export function findLogByTxId(txId: string): PagePayLogEntry | undefined {
+  seedRealTransactions();
   const normalized = txId.trim().toUpperCase();
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i];
@@ -122,6 +229,7 @@ export interface PagePayMetrics {
 }
 
 export function computeMetrics(limit = 200): PagePayMetrics {
+  seedRealTransactions();
   const slice = entries.slice(-limit);
   const settled = slice.filter((e) => e.outcome === "summarized" && e.txId);
   const required = slice.filter((e) => e.outcome === "payment_required");
@@ -180,6 +288,7 @@ export interface AddressTrustScore {
  * Baseline: If totalTransactions === 0, trustScore is 0 (neutral baseline for new addresses).
  */
 export function computeTrustScoreForAddress(rawAddress: string): AddressTrustScore {
+  seedRealTransactions();
   const address = rawAddress.trim().toUpperCase();
   const addressEntries = entries.filter(
     (e) => e.payer && e.payer.trim().toUpperCase() === address,
@@ -251,6 +360,7 @@ export interface AuditVerificationResult {
  * Walk the entire log chain from genesis to head and verify hash continuity.
  */
 export function verifyAuditChain(): AuditVerificationResult {
+  seedRealTransactions();
   const total = entries.length;
   const verifiedAt = new Date().toISOString();
 
@@ -292,5 +402,6 @@ export function verifyAuditChain(): AuditVerificationResult {
 
 /** Testing helper: Direct access to internal entries array for controlled tampering tests. */
 export function _getInternalEntries(): PagePayLogEntry[] {
+  seedRealTransactions();
   return entries;
 }
