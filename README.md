@@ -23,6 +23,9 @@
 
 > [!IMPORTANT]
 > **WELCOME JUDGES!** This section provides everything you need to evaluate and test PagePay in 2 minutes.
+> 
+> 📊 **Presentation Deck**: [PagePay Google Slides Presentation](https://docs.google.com/presentation/d/1LsFjPI-wy1FFczWPuZOhGm0xdPFwhS8nvlPdA1HF18w/edit?usp=sharing)
+
 
 ### 💡 1. Problem & Solution (TL;DR)
 - **The Problem**: Web2 API monetization requires human accounts, CAPTCHAs, email verification, and credit cards via Stripe. Autonomous AI agents operate headlessly and cannot pass CAPTCHAs, fill out forms, or hold corporate credit cards.
