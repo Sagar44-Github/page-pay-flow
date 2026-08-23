@@ -25,10 +25,14 @@ function Loading() {
   );
 }
 
+import { SafeErrorBoundary } from "@/components/SafeErrorBoundary";
+
 function Index() {
   return (
-    <Suspense fallback={<Loading />}>
-      <LandingPage />
-    </Suspense>
+    <SafeErrorBoundary name="LandingPage">
+      <Suspense fallback={<Loading />}>
+        <LandingPage />
+      </Suspense>
+    </SafeErrorBoundary>
   );
 }

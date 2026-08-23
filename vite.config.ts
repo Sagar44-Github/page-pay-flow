@@ -31,7 +31,6 @@ export default defineConfig(async () => {
             "@react-three/fiber": browserOnlyStub,
             "@react-three/drei": browserOnlyStub,
             three: browserOnlyStub,
-            "@perawallet/connect": peraStub,
           },
         },
       },
@@ -43,7 +42,6 @@ export default defineConfig(async () => {
         "@react-three/fiber": browserOnlyStub,
         "@react-three/drei": browserOnlyStub,
         three: browserOnlyStub,
-        "@perawallet/connect": peraStub,
       },
       vercel: {
         functions: {

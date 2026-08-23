@@ -257,6 +257,14 @@ export function computeMetrics(limit = 200): PagePayMetrics {
   };
 }
 
+export interface ScoreBreakdown {
+  txCountPoints: number;
+  successRatePoints: number;
+  volumeBonusPoints: number;
+  formula: string;
+  basis: string[];
+}
+
 export interface AddressTrustScore {
   address: string;
   trustScore: number;
@@ -267,6 +275,7 @@ export interface AddressTrustScore {
   successRate: number | null;
   firstSeen: string | null;
   lastSeen: string | null;
+  scoreBreakdown: ScoreBreakdown;
 }
 
 /**
@@ -294,6 +303,18 @@ export function computeTrustScoreForAddress(rawAddress: string): AddressTrustSco
     (e) => e.payer && e.payer.trim().toUpperCase() === address,
   );
 
+  const defaultBreakdown: ScoreBreakdown = {
+    txCountPoints: 0,
+    successRatePoints: 0,
+    volumeBonusPoints: 0,
+    formula: "TrustScore = min(100, TxCountPoints[0/40] + SuccessRatePoints[0/40] + VolumeBonusPoints[0/20]) = 0 / 100",
+    basis: [
+      "Settlement Frequency: 0 settled txs × 10 pts = 0/40 pts",
+      "Reliability / Success Rate: 0% × 0.4 = 0/40 pts",
+      "Economic Settlement Volume: $0.00 USD × 50 = 0/20 pts",
+    ],
+  };
+
   if (addressEntries.length === 0) {
     return {
       address: rawAddress.trim(),
@@ -305,6 +326,7 @@ export function computeTrustScoreForAddress(rawAddress: string): AddressTrustSco
       successRate: null,
       firstSeen: null,
       lastSeen: null,
+      scoreBreakdown: defaultBreakdown,
     };
   }
 
@@ -335,6 +357,18 @@ export function computeTrustScoreForAddress(rawAddress: string): AddressTrustSco
 
   const trustScore = totalTransactions > 0 ? Math.min(100, txCountPoints + successRatePoints + volumeBonusPoints) : 0;
 
+  const scoreBreakdown: ScoreBreakdown = {
+    txCountPoints,
+    successRatePoints,
+    volumeBonusPoints,
+    formula: `TrustScore = min(100, TxCountPoints[${txCountPoints}/40] + SuccessRatePoints[${successRatePoints}/40] + VolumeBonusPoints[${volumeBonusPoints}/20]) = ${trustScore} / 100`,
+    basis: [
+      `Settlement Frequency: ${totalTransactions} settled tx(s) × 10 pts = ${txCountPoints}/40 pts`,
+      `Reliability / Success Rate: ${successRate ?? 0}% × 0.4 = ${successRatePoints}/40 pts`,
+      `Economic Settlement Volume: $${usdVolume.toFixed(2)} USD × 50 = ${volumeBonusPoints}/20 pts`,
+    ],
+  };
+
   return {
     address: rawAddress.trim(),
     trustScore,
@@ -345,6 +379,7 @@ export function computeTrustScoreForAddress(rawAddress: string): AddressTrustSco
     successRate,
     firstSeen,
     lastSeen,
+    scoreBreakdown,
   };
 }
 

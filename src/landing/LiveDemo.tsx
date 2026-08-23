@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RangeDemo } from "@/landing/RangeDemo";
+import { MarkdownContent } from "@/components/marketing/MarkdownContent";
 import { CompareDemo } from "@/landing/CompareDemo";
 import { AuditTrailWidget } from "@/components/audit/AuditTrailWidget";
 import {
@@ -551,8 +552,8 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
               <Card title="Summary & Output">
                 {summaryResult ? (
                   <div className="space-y-4">
-                    <div className="rounded-lg border border-border/80 bg-background/80 p-4 space-y-3 font-mono text-xs">
-                      <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                    <div className="rounded-lg border border-border/80 bg-background/80 p-4 space-y-3 font-sans text-xs">
+                      <div className="flex items-center justify-between border-b border-border/40 pb-2 font-mono">
                         <span className="font-bold text-foreground uppercase tracking-wider">
                           Mode: {summaryResult.mode ?? mode}
                         </span>
@@ -560,9 +561,7 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
                           {summaryResult.pricePaid ?? "$0.01"} Settled
                         </span>
                       </div>
-                      <div className="prose prose-invert prose-xs max-w-none text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                        {summaryResult.summary}
-                      </div>
+                      <MarkdownContent>{summaryResult.summary}</MarkdownContent>
                     </div>
 
                     {summaryResult.txId && (

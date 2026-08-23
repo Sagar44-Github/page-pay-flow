@@ -9,11 +9,11 @@ export const DEVELOPERS_SECTIONS: DocSection[] = [
 | Method | Path | Auth / Payment | Description |
 | --- | --- | --- | --- |
 | \`POST\` | \`/api/price\` | None | Calculate page count & USD price quote for document text |
-| \`POST\` | \`/api/summarize\` | HTTP 402 | Single document AI processing (5 extraction modes) |
+| \`POST\` | \`/api/summarize\` | HTTP 402 | Single document AI processing (5 extraction modes with GFM Markdown) |
 | \`POST\` | \`/api/summarize/range\` | HTTP 402 | Page range selection AI processing (e.g. pages 2–5) |
 | \`POST\` | \`/api/compare\` | HTTP 402 | Side-by-side dual document comparison (Document A vs B) |
 | \`GET\` | \`/api/receipt\` | None (Public) | Independent receipt verification service by Algorand TxID |
-| \`GET\` | \`/api/trust-score\` | None (Public) | Algorand address reliability score (0-100) aggregation |
+| \`GET\` | \`/api/trust-score\` | None (Public) | Algorand address reliability score & dynamic formula calculation engine |
 | \`GET\` | \`/api/audit/verify\` | None (Public) | Cryptographic SHA-256 tamper-evident log chain audit check |
 | \`GET\` | \`/api/tools\` | None (Public) | Machine-readable tool discovery for AI Agents (Agentic metadata) |
 | \`GET\` | \`/api/logs\` | None | Recent structured log entries |
@@ -21,8 +21,8 @@ export const DEVELOPERS_SECTIONS: DocSection[] = [
   },
   {
     id: "extraction-modes",
-    title: "5 Extraction Modes",
-    body: `PagePay supports 5 specialized AI extraction modes on \`POST /api/summarize\` and \`POST /api/summarize/range\`:
+    title: "5 Extraction Modes & Markdown Formatting",
+    body: `PagePay supports 5 specialized AI extraction modes on \`POST /api/summarize\` and \`POST /api/summarize/range\`. All outputs are rendered with GFM Markdown (<MarkdownContent>):
 
 1. **\`summary\`** (default): Standard document overview & core key points.
 2. **\`action_items\`**: Extracts actionable tasks, assignees, deadlines, and deliverables.
@@ -133,8 +133,10 @@ export const DEVELOPERS_SECTIONS: DocSection[] = [
   },
   {
     id: "trust-score",
-    title: "GET /api/trust-score (Address Reliability)",
-    body: `Computes a 0–100 reliability score from an address's real PagePay payment history.
+    title: "GET /api/trust-score (Dynamic Formula Engine)",
+    body: `Computes a live 0–100 reliability score and mathematical component breakdown from an address's real PagePay transaction history.
+
+Formula: \`TrustScore = min(100, TxCountPoints + SuccessRatePoints + VolumeBonusPoints)\`
 
 ### Example Request
 
@@ -145,10 +147,21 @@ export const DEVELOPERS_SECTIONS: DocSection[] = [
 \`\`\`json
 {
   "address": "EVEHMXV4HH26HN64SBALS5X5WP2ORM4X6HAJXW7DPH6DOHOP2VVAAAPYPE",
-  "trustScore": 100,
-  "totalTransactions": 10,
-  "totalVolumeUsd": "$0.11",
-  "successRate": 100
+  "trustScore": 82,
+  "totalTransactions": 3,
+  "totalVolumeUsd": "$0.04",
+  "successRate": 100,
+  "scoreBreakdown": {
+    "txCountPoints": 30,
+    "successRatePoints": 40,
+    "volumeBonusPoints": 2,
+    "formula": "TrustScore = min(100, 30 + 40 + 2) = 72 / 100",
+    "basis": [
+      "Settlement Frequency: 3 settled transactions (+30 pts / 40 max)",
+      "Reliability Ratio: 100% success rate (+40 pts / 40 max)",
+      "Economic Volume: $0.04 USD settled volume (+2 pts / 20 max)"
+    ]
+  }
 }
 \`\`\``,
   },

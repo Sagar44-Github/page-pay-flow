@@ -33,9 +33,10 @@
 
 ### ⭐ 2. Unique Selling Proposition (USP) & Core Differentiators
 1. **True Autonomous Agent Economic Agency**: Features a client-side **Agent Spend Policy Guard** enforcing request price caps ($/request) and session budgets ($/session) *before* signature generation.
-2. **5 Specialized AI Extraction Modes & Dual-Doc Compare**: Supports `Summary`, `Action Items`, `Key Risks`, `Compliance Check`, `Checklist`, and side-by-side `Document A vs B` comparison.
-3. **Cryptographic SHA-256 Audit Hash Chain**: Every request entry is hashed sequentially into a tamper-evident chain ($\text{EntryHash}_n = \text{SHA256}(\dots)$) and re-verified via `/api/audit/verify`.
-4. **Public Trust Score & Verification Services**: Includes public read-only endpoints for receipt verification (`/api/receipt?txId=...`), address reliability trust scores (`/api/trust-score?address=...`), and machine-readable agent tool discovery (`/api/tools`).
+2. **5 Specialized AI Extraction Modes & Dual-Doc Compare**: Supports `Summary`, `Action Items`, `Key Risks`, `Compliance Check`, `Checklist`, and side-by-side `Document A vs B` comparison rendered with rich GFM Markdown typography.
+3. **Resilient Multi-Candidate AI Engine & Blob Buffer**: Uses universal Groq models (`llama3-70b-8192`, `llama3-8b-8192`) with multi-candidate fallbacks and in-memory `FormData` Blob buffering for 402 retries.
+4. **Dynamic Agent Trust Score Mathematical Engine**: Public `/api/trust-score` endpoint calculates a live 0-100 score with exact mathematical formula breakdown ($\text{Score} = \min(100, \text{TxCountPoints} + \text{SuccessRatePoints} + \text{VolumeBonusPoints})$) and weight progress cards.
+5. **Cryptographic SHA-256 Audit Hash Chain**: Every request entry is hashed sequentially into a tamper-evident chain ($\text{EntryHash}_n = \text{SHA256}(\dots)$) and re-verified via `/api/audit/verify` and `/api/receipt`.
 
 ### 🔗 3. Verified Algorand Testnet x402 Transaction Links
 Every transaction below was settled on Algorand Testnet using PagePay's HTTP 402 flow and is independently verifiable on the Lora Explorer:
@@ -143,6 +144,7 @@ Traditional SaaS API monetization was designed in the early 2000s under a fundam
 #### The 5 Structural Flaws of Web2 API Billing for Autonomous AI Agents
 
 > [!CAUTION]
+> ### 🚨 THE WEB2 API BILLING PROBLEM (5 STRUCTURAL FLAWS)
 > 1. **The Identity & Sign-Up Bottleneck**:
 >    Autonomous AI agents operate headlessly. An AI agent cannot navigate web sign-up pages, solve hCaptcha/reCAPTCHA challenges, receive SMS verification codes, or verify email confirmation links. Requiring human registration blocks software-to-software commerce entirely.
 >

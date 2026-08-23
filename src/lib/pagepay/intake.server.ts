@@ -61,7 +61,7 @@ async function parseSingleFromForm(
   const file = form.get(fileKey);
   const text = form.get(textKey);
 
-  if (file && typeof file !== "string") {
+  if (file && typeof file !== "string" && file.size > 0) {
     if (file.size > MAX_UPLOAD_BYTES) {
       throw new DocumentError(`${docLabel} is larger than the 10 MB limit.`);
     }
@@ -126,18 +126,16 @@ export async function readTwoDocumentsFromRequest(request: Request): Promise<Two
 
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData();
-    const hasA = form.has("fileA") || form.has("textA") || form.has("documentA");
-    const hasB = form.has("fileB") || form.has("textB") || form.has("documentB");
+    const fileA = form.get("fileA") || form.get("documentA");
+    const textA = form.get("textA") || form.get("documentA");
+    const fileB = form.get("fileB") || form.get("documentB");
+    const textB = form.get("textB") || form.get("documentB");
 
-    if (!hasA) {
-      throw new DocumentError("Document A is missing. Attach fileA/textA or documentA.");
-    }
-    if (!hasB) {
-      throw new DocumentError("Document B is missing. Attach fileB/textB or documentB.");
-    }
+    const fileKeyA = fileA && typeof fileA !== "string" && fileA.size > 0 ? (form.has("fileA") ? "fileA" : "documentA") : (form.has("textA") ? "textA" : "documentA");
+    const fileKeyB = fileB && typeof fileB !== "string" && fileB.size > 0 ? (form.has("fileB") ? "fileB" : "documentB") : (form.has("textB") ? "textB" : "documentB");
 
-    docA = await parseSingleFromForm(form, form.has("fileA") ? "fileA" : "documentA", form.has("textA") ? "textA" : "documentA", "Document A");
-    docB = await parseSingleFromForm(form, form.has("fileB") ? "fileB" : "documentB", form.has("textB") ? "textB" : "documentB", "Document B");
+    docA = await parseSingleFromForm(form, fileKeyA, "textA", "Document A");
+    docB = await parseSingleFromForm(form, fileKeyB, "textB", "Document B");
   } else {
     let payload: unknown;
     try {

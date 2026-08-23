@@ -43,19 +43,23 @@ export function usePeraWallet(): PeraWallet {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let mounted = true;
-    getPera().then((pera) => {
-      if (!mounted) return;
-      pera
-        .reconnectSession()
-        .then((accounts) => {
-          if (!mounted) return;
-          if (accounts.length > 0 && accounts[0]) setAddress(accounts[0]);
-          pera.connector?.on("disconnect", () => setAddress(null));
-        })
-        .catch(() => {
-          /* no previous session */
-        });
-    });
+    getPera()
+      .then((pera) => {
+        if (!mounted) return;
+        pera
+          .reconnectSession()
+          .then((accounts) => {
+            if (!mounted) return;
+            if (accounts.length > 0 && accounts[0]) setAddress(accounts[0]);
+            pera.connector?.on("disconnect", () => setAddress(null));
+          })
+          .catch(() => {
+            /* no previous session */
+          });
+      })
+      .catch((err) => {
+        console.warn("[pagepay] PeraWalletConnect init ignored on auto-reconnect:", err);
+      });
     return () => {
       mounted = false;
       if (peraRef.current?.connector) {

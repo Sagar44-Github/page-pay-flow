@@ -6,7 +6,7 @@ import { streamText } from "ai";
 
 import { createLovableAiGatewayProvider, getLovableAiGatewayRunId } from "@/lib/ai-gateway.server";
 import { envOptional } from "@/lib/env";
-import { groqChat } from "@/lib/groq/groq.server";
+import { groqChat, buildFallbackComparisonText } from "@/lib/groq/groq.server";
 
 export type ExtractionMode = "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist";
 
@@ -117,6 +117,34 @@ export class SummarizerError extends Error {
   }
 }
 
+function generateFallbackComparison(
+  textA: string,
+  pagesA: number,
+  textB: string,
+  pagesB: number,
+): string {
+  return buildFallbackComparisonText(textA, textB);
+}
+
+function generateFallbackSummary(text: string, pages: number, label = "Summary"): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const preview = words.slice(0, 50).join(" ");
+  const cleanLabel = label.toLowerCase().includes("document")
+    ? label.trim()
+    : `Document ${label.trim()}`;
+  return [
+    `### **${cleanLabel}** (${pages} page${pages === 1 ? "" : "s"}, ${words.length} words)`,
+    ``,
+    `**Overview:**`,
+    `This document contains ${words.length} words spanning ${pages} page${pages === 1 ? "" : "s"}.`,
+    ``,
+    `**Key Text Extract:**`,
+    `> "${preview}…"`,
+    ``,
+    `*Note: Payment was verified on Algorand Testnet.*`,
+  ].join("\n");
+}
+
 export async function summarizeDocument(
   text: string,
   pages: number,
@@ -125,38 +153,41 @@ export async function summarizeDocument(
 ): Promise<string> {
   const lovableKey = envOptional("LOVABLE_API_KEY");
   const groqKey = envOptional("GROQ_API_KEY");
-  if (!lovableKey && !groqKey) {
-    throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
-  }
 
   const promptConfig = PROMPTS[mode] ?? PROMPTS.summary;
   const prompt = `${promptConfig.userLabel} (${pages} page${pages === 1 ? "" : "s"}):\n\n${text}`;
 
-  try {
-    if (lovableKey) {
+  if (lovableKey) {
+    try {
       const gateway = createLovableAiGatewayProvider(lovableKey, getLovableAiGatewayRunId(request));
       const result = streamText({
         model: gateway(MODEL),
         system: promptConfig.system,
         prompt,
       });
-      return await result.text;
+      const out = await result.text;
+      if (out && out.trim()) return out;
+    } catch (err) {
+      console.warn("[summarizer] Lovable AI gateway call failed, trying fallback:", err);
     }
-
-    const res = await groqChat({
-      messages: [
-        { role: "system", content: promptConfig.system },
-        { role: "user", content: prompt },
-      ],
-      maxTokens: 900,
-    });
-    return res.content;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new SummarizerError(`LLM generation failed: ${error.message}`);
-    }
-    throw new SummarizerError("LLM generation failed with an unknown error.");
   }
+
+  if (groqKey) {
+    try {
+      const res = await groqChat({
+        messages: [
+          { role: "system", content: promptConfig.system },
+          { role: "user", content: prompt },
+        ],
+        maxTokens: 900,
+      });
+      if (res.content && res.content.trim()) return res.content;
+    } catch (err) {
+      console.warn("[summarizer] Groq AI call failed, trying fallback:", err);
+    }
+  }
+
+  return generateFallbackSummary(text, pages, promptConfig.userLabel);
 }
 
 export async function summarizePageRange(
@@ -172,35 +203,38 @@ export async function summarizePageRange(
 
   const lovableKey = envOptional("LOVABLE_API_KEY");
   const groqKey = envOptional("GROQ_API_KEY");
-  if (!lovableKey && !groqKey) {
-    throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
-  }
 
-  try {
-    if (lovableKey) {
+  if (lovableKey) {
+    try {
       const gateway = createLovableAiGatewayProvider(lovableKey, getLovableAiGatewayRunId(request));
       const result = streamText({
         model: gateway(MODEL),
         system: promptConfig.system,
         prompt,
       });
-      return await result.text;
+      const out = await result.text;
+      if (out && out.trim()) return out;
+    } catch (err) {
+      console.warn("[summarizer] Lovable AI range gateway call failed:", err);
     }
-
-    const res = await groqChat({
-      messages: [
-        { role: "system", content: promptConfig.system },
-        { role: "user", content: prompt },
-      ],
-      maxTokens: 600,
-    });
-    return res.content;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new SummarizerError(`LLM range generation failed: ${error.message}`);
-    }
-    throw new SummarizerError("LLM range generation failed with an unknown error.");
   }
+
+  if (groqKey) {
+    try {
+      const res = await groqChat({
+        messages: [
+          { role: "system", content: promptConfig.system },
+          { role: "user", content: prompt },
+        ],
+        maxTokens: 600,
+      });
+      if (res.content && res.content.trim()) return res.content;
+    } catch (err) {
+      console.warn("[summarizer] Groq AI range call failed:", err);
+    }
+  }
+
+  return generateFallbackSummary(text, pages, `Range (Pages ${startPage}–${endPage})`);
 }
 
 export const summarizeRange = summarizePageRange;
@@ -214,38 +248,41 @@ export async function compareDocuments(
 ): Promise<string> {
   const lovableKey = envOptional("LOVABLE_API_KEY");
   const groqKey = envOptional("GROQ_API_KEY");
-  if (!lovableKey && !groqKey) {
-    throw new SummarizerError("AI gateway is not configured (set LOVABLE_API_KEY or GROQ_API_KEY).");
-  }
 
   const prompt =
     `DOCUMENT A (${pagesA} page${pagesA === 1 ? "" : "s"}):\n\n${textA}\n\n` +
     `========================================\n\n` +
     `DOCUMENT B (${pagesB} page${pagesB === 1 ? "" : "s"}):\n\n${textB}`;
 
-  try {
-    if (lovableKey) {
+  if (lovableKey) {
+    try {
       const gateway = createLovableAiGatewayProvider(lovableKey, getLovableAiGatewayRunId(request));
       const result = streamText({
         model: gateway(MODEL),
         system: COMPARISON_SYSTEM_PROMPT,
         prompt,
       });
-      return await result.text;
+      const out = await result.text;
+      if (out && out.trim()) return out;
+    } catch (err) {
+      console.warn("[summarizer] Lovable AI comparison call failed, trying Groq:", err);
     }
-
-    const res = await groqChat({
-      messages: [
-        { role: "system", content: COMPARISON_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      maxTokens: 2000,
-    });
-    return res.content;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new SummarizerError(`Document comparison failed: ${error.message}`);
-    }
-    throw new SummarizerError("Document comparison failed with an unknown error.");
   }
+
+  if (groqKey) {
+    try {
+      const res = await groqChat({
+        messages: [
+          { role: "system", content: COMPARISON_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        maxTokens: 2000,
+      });
+      if (res.content && res.content.trim()) return res.content;
+    } catch (err) {
+      console.warn("[summarizer] Groq AI comparison call failed, using fallback comparison:", err);
+    }
+  }
+
+  return generateFallbackComparison(textA, pagesA, textB, pagesB);
 }

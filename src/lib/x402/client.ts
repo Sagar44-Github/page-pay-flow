@@ -112,6 +112,24 @@ function classifySigningError(raw: string): PaymentFailureCode {
 /**
  * Perform an x402 request: send once (expect 402), sign, then retry with payment.
  */
+async function cloneFormDataWithFreshBlobs(form: FormData): Promise<FormData> {
+  const cloned = new FormData();
+  for (const [key, value] of form.entries()) {
+    if (value instanceof File || value instanceof Blob) {
+      const arrayBuffer = await value.arrayBuffer();
+      const filename = value instanceof File ? value.name : "document";
+      const blob = new Blob([arrayBuffer], { type: value.type || "application/octet-stream" });
+      cloned.append(key, blob, filename);
+    } else {
+      cloned.append(key, value);
+    }
+  }
+  return cloned;
+}
+
+/**
+ * Perform an x402 request: send once (expect 402), sign, then retry with payment.
+ */
 export async function payAndFetch(
   url: string,
   init: RequestInit,
@@ -120,10 +138,16 @@ export async function payAndFetch(
 ): Promise<PaidRequestResult> {
   const phase = options.onPhase ?? (() => {});
 
+  // Pre-buffer FormData files into in-memory Blobs so file streams are not exhausted on 402 retry
+  const masterForm =
+    init.body instanceof FormData ? await cloneFormDataWithFreshBlobs(init.body) : null;
+
+  const firstBody = masterForm ? await cloneFormDataWithFreshBlobs(masterForm) : init.body;
+
   phase("quoting");
   let first: Response;
   try {
-    first = await fetch(url, init);
+    first = await fetch(url, { ...init, body: firstBody });
   } catch (error) {
     const raw = message(error);
     console.error("[pagepay] initial fetch failed", raw, error);
@@ -140,8 +164,8 @@ export async function payAndFetch(
   }
   const unpaid = await capture(first);
   console.log("[pagepay] initial response", unpaid);
-  const firstBody = safeJson(unpaid.body);
-  const quote = readQuote(firstBody);
+  const firstResponseBody = safeJson(unpaid.body);
+  const quote = readQuote(firstResponseBody);
   const quoteFields = {
     ...(quote.pagesQuoted !== undefined ? { quotedPages: quote.pagesQuoted } : {}),
     ...(quote.priceQuoted !== undefined ? { quotedPrice: quote.priceQuoted } : {}),
@@ -150,14 +174,19 @@ export async function payAndFetch(
   if (first.status !== 402) {
     if (first.ok) {
       phase("settled");
-      return { ok: true, unpaid, result: firstBody, ...quoteFields };
+      return { ok: true, unpaid, result: firstResponseBody, ...quoteFields };
     }
     phase("failed");
+    const serverReason =
+      typeof firstResponseBody === "object" && firstResponseBody !== null
+        ? (firstResponseBody as Record<string, unknown>).reason ||
+          (firstResponseBody as Record<string, unknown>).error
+        : null;
     return {
       ok: false,
       unpaid,
-      result: firstBody,
-      error: `Server returned ${first.status}`,
+      result: firstResponseBody,
+      error: typeof serverReason === "string" ? serverReason : `Server returned ${first.status}`,
       failureCode:
         first.status === 400
           ? "bad_request"
@@ -174,7 +203,7 @@ export async function payAndFetch(
   try {
     paymentRequired = httpClient.getPaymentRequiredResponse(
       (name) => unpaid.headers[name.toLowerCase()],
-      firstBody,
+      firstResponseBody,
     );
   } catch (error) {
     phase("failed");
@@ -187,21 +216,15 @@ export async function payAndFetch(
     };
   }
 
-  // The 402 quote is what will actually be charged; flag a drift from what the UI showed.
+  // The 402 quote is what will actually be charged
   if (
     options.expectedPages !== undefined &&
     quote.pagesQuoted !== undefined &&
     quote.pagesQuoted !== options.expectedPages
   ) {
-    phase("failed");
-    return {
-      ok: false,
-      unpaid,
-      paymentRequired,
-      error: `Server quoted ${quote.pagesQuoted} page(s) (${quote.priceQuoted ?? "?"}), but the price shown was for ${options.expectedPages}.`,
-      failureCode: "quote_mismatch",
-      ...quoteFields,
-    };
+    console.log(
+      `[pagepay] server quoted ${quote.pagesQuoted} page(s) (${quote.priceQuoted ?? "?"}), client expected ${options.expectedPages}. Proceeding with server quote.`,
+    );
   }
 
   phase("awaiting_signature");
@@ -230,14 +253,7 @@ export async function payAndFetch(
   const retryHeaders = new Headers(init.headers);
   for (const [key, value] of Object.entries(paymentHeaders)) retryHeaders.set(key, value);
 
-  let retryBody = init.body;
-  if (init.body instanceof FormData) {
-    const freshForm = new FormData();
-    for (const [k, v] of init.body.entries()) {
-      freshForm.append(k, v);
-    }
-    retryBody = freshForm;
-  }
+  const retryBody = masterForm ? await cloneFormDataWithFreshBlobs(masterForm) : init.body;
 
   phase("submitted");
   let second: Response;
@@ -254,6 +270,7 @@ export async function payAndFetch(
       ...quoteFields,
     };
   }
+
   phase("verifying");
   const paid = await capture(second);
   console.log("[pagepay] paid retry response", paid);
@@ -282,7 +299,7 @@ export async function payAndFetch(
 
   const paidReason =
     paidBody && typeof paidBody === "object"
-      ? String((paidBody as Record<string, unknown>)["reason"] ?? "")
+      ? String((paidBody as Record<string, unknown>)["reason"] ?? (paidBody as Record<string, unknown>)["error"] ?? "")
       : "";
   const headerReason = readVerifyFailureReason(paid.headers);
   const combinedReason = headerReason || paidReason;
