@@ -89,7 +89,7 @@ export function CompareDemo({ wallet }: { wallet: PeraWallet }) {
   const [exchange, setExchange] = useState<PaidRequestResult | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
 
-  // Client-side PDF page counting
+  // Client-side PDF page counting via /api/price intake
   useEffect(() => {
     if (!fileA) {
       setPdfPagesA(null);
@@ -97,12 +97,14 @@ export function CompareDemo({ wallet }: { wallet: PeraWallet }) {
     }
     const isPdf = fileA.type === "application/pdf" || fileA.name.toLowerCase().endsWith(".pdf");
     if (isPdf) {
-      void fileA.arrayBuffer().then((buf) => {
-        const text = new TextDecoder("latin1").decode(new Uint8Array(buf));
-        const matches = text.match(/\/Type\s*\/Page\b/g);
-        const count = matches ? matches.length : 1;
-        setPdfPagesA(count > 0 ? count : 1);
-      });
+      const form = new FormData();
+      form.append("file", fileA);
+      fetch("/api/price", { method: "POST", body: form })
+        .then((res) => res.json())
+        .then((data: { pages?: number }) => {
+          if (data.pages) setPdfPagesA(data.pages);
+        })
+        .catch(() => setPdfPagesA(1));
     } else {
       setPdfPagesA(1);
     }
@@ -115,12 +117,14 @@ export function CompareDemo({ wallet }: { wallet: PeraWallet }) {
     }
     const isPdf = fileB.type === "application/pdf" || fileB.name.toLowerCase().endsWith(".pdf");
     if (isPdf) {
-      void fileB.arrayBuffer().then((buf) => {
-        const text = new TextDecoder("latin1").decode(new Uint8Array(buf));
-        const matches = text.match(/\/Type\s*\/Page\b/g);
-        const count = matches ? matches.length : 1;
-        setPdfPagesB(count > 0 ? count : 1);
-      });
+      const form = new FormData();
+      form.append("file", fileB);
+      fetch("/api/price", { method: "POST", body: form })
+        .then((res) => res.json())
+        .then((data: { pages?: number }) => {
+          if (data.pages) setPdfPagesB(data.pages);
+        })
+        .catch(() => setPdfPagesB(1));
     } else {
       setPdfPagesB(1);
     }

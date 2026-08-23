@@ -5,7 +5,7 @@
  * Key Risks, Compliance Check, Checklist), page range selection, dual-document comparison,
  * autonomous agent policy enforcement ("Run as Agent"), and automatic post-settlement audit trail verification.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FileText,
   Lock,
@@ -139,6 +139,38 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
 
   const [policy, setPolicy] = useState<AgentSpendPolicy>(DEFAULT_AGENT_POLICY);
   const [showPolicyConfig, setShowPolicyConfig] = useState(false);
+  const [filePages, setFilePages] = useState<number | null>(null);
+
+  // Automatically calculate page count & quote when a PDF or document file is uploaded
+  useEffect(() => {
+    if (!file) {
+      setFilePages(null);
+      return;
+    }
+    let isSubscribed = true;
+    setQuoting(true);
+    const form = new FormData();
+    form.append("file", file);
+
+    fetch("/api/price", { method: "POST", body: form })
+      .then((res) => res.json())
+      .then((data: { pages?: number; price?: string }) => {
+        if (isSubscribed && data.pages && data.price) {
+          setFilePages(data.pages);
+          setQuote({ pages: data.pages, price: data.price });
+        }
+      })
+      .catch(() => {
+        if (isSubscribed) setFilePages(1);
+      })
+      .finally(() => {
+        if (isSubscribed) setQuoting(false);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [file]);
 
   const localPages = useMemo(() => {
     if (file) return null;
@@ -147,6 +179,8 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
     const words = trimmed.split(/\s+/).filter(Boolean).length;
     return Math.max(1, Math.min(MAX_PAGES, Math.ceil(words / 500)));
   }, [file, text]);
+
+  const totalPages = file ? (filePages ?? 1) : (localPages ?? 0);
 
   const summaryResult = useMemo<SummaryResult | null>(() => {
     if (!exchange || !exchange.ok) return null;
@@ -341,7 +375,19 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
                   />
                 </label>
                 {file && (
-                  <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => setFile(null)}>
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2 font-mono text-xs text-primary">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <FileText className="size-3.5" />
+                      {quoting ? "Calculating document page count…" : `${filePages ?? 1} page${(filePages ?? 1) === 1 ? "" : "s"} detected`}
+                    </span>
+                    <span className="font-bold">
+                      {quote?.price ?? priceForPages(filePages ?? 1)}
+                    </span>
+                  </div>
+                )}
+
+                {file && (
+                  <Button variant="ghost" size="sm" className="mt-2 text-xs text-muted-foreground" onClick={() => { setFile(null); setFilePages(null); setQuote(null); }}>
                     Remove file
                   </Button>
                 )}
@@ -363,8 +409,8 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
                   />
                 </div>
 
-                {localPages !== null && localPages > 0 && (
-                  <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                {localPages !== null && localPages > 0 && !file && (
+                  <p className="mt-2 font-mono text-[11px] font-semibold text-primary">
                     ≈ {localPages} page{localPages === 1 ? "" : "s"} · {priceForPages(localPages)}
                   </p>
                 )}
@@ -448,7 +494,13 @@ export function LiveDemo({ wallet }: { wallet: PeraWallet; onOpenWalkthrough?: (
                 </div>
 
                 <div className="mb-5">
-                  <RangeDemo wallet={wallet} defaultMode={mode} />
+                  <RangeDemo
+                    wallet={wallet}
+                    totalPages={totalPages}
+                    file={file}
+                    text={text}
+                    defaultMode={mode}
+                  />
                 </div>
 
                 {/* Primary Action Buttons */}

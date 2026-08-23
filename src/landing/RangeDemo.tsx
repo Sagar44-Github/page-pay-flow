@@ -5,7 +5,7 @@
  * Always present in the UI; locked when totalPages <= 1, smoothly unlocks when a multi-page document is loaded.
  */
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock, Unlock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -95,13 +95,24 @@ export function RangeDemo({
   const isMultiPage = totalPages > 1;
   const effectiveTotalPages = totalPages > 0 ? totalPages : 1;
 
-  // Keep endPage in sync when totalPages changes.
+  // Keep startPage and endPage in sync when totalPages changes.
+  useEffect(() => {
+    if (totalPages > 1) {
+      setStartPage(1);
+      setEndPage(totalPages);
+    } else {
+      setStartPage(1);
+      setEndPage(1);
+    }
+  }, [totalPages]);
+
   const clampedStart = Math.max(1, Math.min(startPage, effectiveTotalPages));
   const clampedEnd = Math.max(clampedStart, Math.min(endPage, effectiveTotalPages));
   const rangePages = clampedEnd - clampedStart + 1;
   const rangePrice = priceForPages(rangePages);
 
   const rangeValid = isMultiPage && hasDoc && clampedStart >= 1 && clampedEnd <= effectiveTotalPages && clampedStart <= clampedEnd;
+
 
   async function handleSummarizeRange() {
     if (!rangeValid) return;
