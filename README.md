@@ -141,7 +141,7 @@ Traditional SaaS API monetization was designed in the early 2000s under a fundam
 #### The 5 Structural Flaws of Web2 API Billing for Autonomous AI Agents
 
 > [!CAUTION]
-> ### 🚨 THE WEB2 API BILLING PROBLEM
+> ### 🚨 THE WEB2 API BILLING PROBLEM (5 STRUCTURAL FLAWS)
 > 1. **The Identity & Sign-Up Bottleneck**:
 >    Autonomous AI agents operate headlessly. An AI agent cannot navigate web sign-up pages, solve hCaptcha/reCAPTCHA challenges, receive SMS verification codes, or verify email confirmation links. Requiring human registration blocks software-to-software commerce entirely.
 >
