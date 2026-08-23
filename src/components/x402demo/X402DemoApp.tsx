@@ -121,7 +121,7 @@ export default function X402DemoApp() {
     defaultValues: {
       prompt:
         "Brief a technical audience on why HTTP 402 machine payments unlock new agent business models.",
-      model: "llama-3.3-70b-versatile",
+      model: "llama3-70b-8192",
     },
   });
 
