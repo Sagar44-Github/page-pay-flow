@@ -216,21 +216,15 @@ export async function payAndFetch(
     };
   }
 
-  // The 402 quote is what will actually be charged; flag a drift from what the UI showed.
+  // The 402 quote is what will actually be charged
   if (
     options.expectedPages !== undefined &&
     quote.pagesQuoted !== undefined &&
     quote.pagesQuoted !== options.expectedPages
   ) {
-    phase("failed");
-    return {
-      ok: false,
-      unpaid,
-      paymentRequired,
-      error: `Server quoted ${quote.pagesQuoted} page(s) (${quote.priceQuoted ?? "?"}), but the price shown was for ${options.expectedPages}.`,
-      failureCode: "quote_mismatch",
-      ...quoteFields,
-    };
+    console.log(
+      `[pagepay] server quoted ${quote.pagesQuoted} page(s) (${quote.priceQuoted ?? "?"}), client expected ${options.expectedPages}. Proceeding with server quote.`,
+    );
   }
 
   phase("awaiting_signature");

@@ -6,7 +6,7 @@
  * structured comparison output with clear "A vs B" framing.
  */
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, ArrowRightLeft, Sparkles, Scale } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -81,13 +81,53 @@ export function CompareDemo({ wallet }: { wallet: PeraWallet }) {
   const [fileB, setFileB] = useState<File | null>(null);
   const [textB, setTextB] = useState("");
 
+  const [pdfPagesA, setPdfPagesA] = useState<number | null>(null);
+  const [pdfPagesB, setPdfPagesB] = useState<number | null>(null);
+
   const [running, setRunning] = useState(false);
   const [phase, setPhase] = useState<PaymentPhase | null>(null);
   const [exchange, setExchange] = useState<PaidRequestResult | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
 
-  const pagesA = fileA ? 1 : textA.trim() ? pagesForText(textA) : 0;
-  const pagesB = fileB ? 1 : textB.trim() ? pagesForText(textB) : 0;
+  // Client-side PDF page counting
+  useEffect(() => {
+    if (!fileA) {
+      setPdfPagesA(null);
+      return;
+    }
+    const isPdf = fileA.type === "application/pdf" || fileA.name.toLowerCase().endsWith(".pdf");
+    if (isPdf) {
+      void fileA.arrayBuffer().then((buf) => {
+        const text = new TextDecoder("latin1").decode(new Uint8Array(buf));
+        const matches = text.match(/\/Type\s*\/Page\b/g);
+        const count = matches ? matches.length : 1;
+        setPdfPagesA(count > 0 ? count : 1);
+      });
+    } else {
+      setPdfPagesA(1);
+    }
+  }, [fileA]);
+
+  useEffect(() => {
+    if (!fileB) {
+      setPdfPagesB(null);
+      return;
+    }
+    const isPdf = fileB.type === "application/pdf" || fileB.name.toLowerCase().endsWith(".pdf");
+    if (isPdf) {
+      void fileB.arrayBuffer().then((buf) => {
+        const text = new TextDecoder("latin1").decode(new Uint8Array(buf));
+        const matches = text.match(/\/Type\s*\/Page\b/g);
+        const count = matches ? matches.length : 1;
+        setPdfPagesB(count > 0 ? count : 1);
+      });
+    } else {
+      setPdfPagesB(1);
+    }
+  }, [fileB]);
+
+  const pagesA = pdfPagesA ?? (fileA ? 1 : textA.trim() ? pagesForText(textA) : 0);
+  const pagesB = pdfPagesB ?? (fileB ? 1 : textB.trim() ? pagesForText(textB) : 0);
   const combinedPages = (pagesA > 0 ? pagesA : 1) + (pagesB > 0 ? pagesB : 1);
   const combinedPrice = priceForPages(combinedPages);
   const hasBothDocs = (Boolean(fileA) || textA.trim().length > 0) && (Boolean(fileB) || textB.trim().length > 0);
