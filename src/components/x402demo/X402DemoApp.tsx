@@ -51,7 +51,7 @@ const formSchema = z.object({
     .trim()
     .min(8, "Give the gated resource at least 8 characters of context.")
     .max(2000, "Keep the prompt under 2000 characters."),
-  model: z.enum(["openai/gpt-oss-20b", "qwen/qwen3.6-27b"]),
+  model: z.string(),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -121,7 +121,7 @@ export default function X402DemoApp() {
     defaultValues: {
       prompt:
         "Brief a technical audience on why HTTP 402 machine payments unlock new agent business models.",
-      model: "openai/gpt-oss-20b",
+      model: "llama-3.3-70b-versatile",
     },
   });
 

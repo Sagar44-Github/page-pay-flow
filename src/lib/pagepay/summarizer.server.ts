@@ -156,14 +156,17 @@ function generateFallbackComparison(
 function generateFallbackSummary(text: string, pages: number, label = "Summary"): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
   const preview = words.slice(0, 50).join(" ");
+  const cleanLabel = label.toLowerCase().includes("document")
+    ? label.trim()
+    : `Document ${label.trim()}`;
   return [
-    `### **Document ${label}** (${pages} page${pages === 1 ? "" : "s"}, ${words.length} words)`,
+    `### **${cleanLabel}** (${pages} page${pages === 1 ? "" : "s"}, ${words.length} words)`,
     ``,
     `**Overview:**`,
     `This document contains ${words.length} words spanning ${pages} page${pages === 1 ? "" : "s"}.`,
     ``,
     `**Key Text Extract:**`,
-    `"${preview}…"`,
+    `> "${preview}…"`,
     ``,
     `*Note: Payment was verified on Algorand Testnet.*`,
   ].join("\n");
