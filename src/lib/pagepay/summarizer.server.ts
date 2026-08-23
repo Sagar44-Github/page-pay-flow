@@ -6,7 +6,7 @@ import { streamText } from "ai";
 
 import { createLovableAiGatewayProvider, getLovableAiGatewayRunId } from "@/lib/ai-gateway.server";
 import { envOptional } from "@/lib/env";
-import { groqChat } from "@/lib/groq/groq.server";
+import { groqChat, buildFallbackComparisonText } from "@/lib/groq/groq.server";
 
 export type ExtractionMode = "summary" | "action_items" | "key_risks" | "compliance_check" | "checklist";
 
@@ -123,34 +123,7 @@ function generateFallbackComparison(
   textB: string,
   pagesB: number,
 ): string {
-  const wordsA = textA.trim().split(/\s+/).filter(Boolean);
-  const wordsB = textB.trim().split(/\s+/).filter(Boolean);
-
-  const previewA = wordsA.slice(0, 35).join(" ");
-  const previewB = wordsB.slice(0, 35).join(" ");
-
-  return [
-    `### 1. **Overview of Comparison**`,
-    `This side-by-side analysis compares **Document A** (${pagesA} page${pagesA === 1 ? "" : "s"}, ${wordsA.length} words) against **Document B** (${pagesB} page${pagesB === 1 ? "" : "s"}, ${wordsB.length} words).`,
-    ``,
-    `### 2. **Present in Document A, Missing in Document B**`,
-    `- **Primary Focus A**: "${previewA}…"`,
-    `- Document A includes terms and provisions comprising ${wordsA.length} total words.`,
-    ``,
-    `### 3. **Present in Document B, Missing in Document A**`,
-    `- **Primary Focus B**: "${previewB}…"`,
-    `- Document B sets out specific terms comprising ${wordsB.length} total words.`,
-    ``,
-    `### 4. **Side-by-Side Differences & Discrepancies**`,
-    `| Metric / Attribute | Document A | Document B |`,
-    `| :--- | :--- | :--- |`,
-    `| **Page Count** | ${pagesA} page(s) | ${pagesB} page(s) |`,
-    `| **Word Volume** | ${wordsA.length} words | ${wordsB.length} words |`,
-    `| **Structural Complexity** | ${wordsA.length > 50 ? "Multi-section text" : "Short statement"} | ${wordsB.length > 50 ? "Multi-section text" : "Short statement"} |`,
-    ``,
-    `### 5. **Comparative Conclusion**`,
-    `Both documents have been processed and verified on Algorand Testnet. Review the word volume and structural discrepancies above to assess the differences between Document A and Document B.`,
-  ].join("\n");
+  return buildFallbackComparisonText(textA, textB);
 }
 
 function generateFallbackSummary(text: string, pages: number, label = "Summary"): string {
